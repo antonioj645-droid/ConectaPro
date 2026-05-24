@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "409724060713",
+    "project_id": "conectapro-ff6d5",
+    "storage_bucket": "conectapro-ff6d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:409724060713:android:2f5ff0f50c6586ee6d8838",
+        "android_client_info": {
+          "package_name": "com.conectapro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxzjKBnukUuZ8usOHGvM5TSxjZwpUjdzU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:409724060713:android:87173ae39d2f209c6d8838",
+        "android_client_info": {
+          "package_name": "com.example.conectapro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxzjKBnukUuZ8usOHGvM5TSxjZwpUjdzU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
