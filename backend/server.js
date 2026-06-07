@@ -2,13 +2,11 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-
-// ✅ Firebase
 const admin = require('firebase-admin');
 
 const app = express();
 
-// ✅ 🔥 ESSA LINHA RESOLVE O PROBLEMA DO RENDER
+// ✅ 🔥 ESSA LINHA É OBRIGATÓRIA NO RENDER
 app.set('trust proxy', 1);
 
 // ✅ MIDDLEWARES
@@ -24,12 +22,14 @@ try {
     throw new Error("FIREBASE_KEY não encontrada.");
   }
 
-  const serviceAccount =
-    JSON.parse(process.env.FIREBASE_KEY);
+  const serviceAccount = JSON.parse(process.env.FIREBASE_KEY);
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  // ✅ evita erro de múltiplas inicializações
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
 
   console.log("✅ Firebase conectado com sucesso");
 
@@ -43,7 +43,7 @@ try {
 // =========================
 const pixRoutes = require('./routes/pix');
 
-// ✅ prefixo /pix
+// ✅ prefixo correto
 app.use('/pix', pixRoutes);
 
 // =========================
@@ -54,7 +54,7 @@ app.get('/', (req, res) => {
 });
 
 // =========================
-// ✅ PORTA (Render usa essa)
+// ✅ PORTA
 // =========================
 const PORT = process.env.PORT || 3000;
 
