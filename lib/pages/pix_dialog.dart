@@ -6,22 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
-// ─────────────────────────────
-// CONFIG
-// ─────────────────────────────
-
-const String _kBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:3000',
-);
+// ✅ CORREÇÃO PRINCIPAL (BACKEND ONLINE)
+const String _kBaseUrl =
+    'https://conectapro-backend-1.onrender.com';
 
 const Duration _kHttpTimeout     = Duration(seconds: 60);
 const Duration _kPollingInterval = Duration(seconds: 5);
 const int      _kMaxAttempts     = 60;
-
-// ─────────────────────────────
-// WIDGET
-// ─────────────────────────────
 
 class PixDialog extends StatefulWidget {
   final double valor;
@@ -57,9 +48,9 @@ class _PixDialogState extends State<PixDialog> {
     super.dispose();
   }
 
-  // ─────────────────────────────
+  // =============================
   // GERAR PIX
-  // ─────────────────────────────
+  // =============================
   Future<void> _gerarPix() async {
 
     setState(() {
@@ -68,6 +59,7 @@ class _PixDialogState extends State<PixDialog> {
     });
 
     try {
+
       final response = await http.post(
         Uri.parse('$_kBaseUrl/pix/criar-pix'),
         headers: {'Content-Type': 'application/json'},
@@ -77,6 +69,9 @@ class _PixDialogState extends State<PixDialog> {
           'nome': 'Antonio',
         }),
       ).timeout(_kHttpTimeout);
+
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
 
       final data = jsonDecode(response.body);
 
@@ -89,8 +84,8 @@ class _PixDialogState extends State<PixDialog> {
 
       setState(() {
         _pixCopiaCola = data['pixCopiaECola'] ?? '';
-        _paymentId = data['paymentId'] ?? '';
-        _qrCodeImage = raw.isNotEmpty ? base64Decode(raw) : null;
+        _paymentId    = data['paymentId'] ?? '';
+        _qrCodeImage  = raw.isNotEmpty ? base64Decode(raw) : null;
 
         _loading = false;
         _erro = _qrCodeImage == null;
@@ -102,6 +97,8 @@ class _PixDialogState extends State<PixDialog> {
 
     } catch (e) {
 
+      print("ERRO PIX: $e");
+
       setState(() {
         _loading = false;
         _erro = true;
@@ -109,9 +106,9 @@ class _PixDialogState extends State<PixDialog> {
     }
   }
 
-  // ─────────────────────────────
+  // =============================
   // POLLING
-  // ─────────────────────────────
+  // =============================
   void _iniciarPolling() {
 
     _tentativas = 0;
@@ -124,6 +121,7 @@ class _PixDialogState extends State<PixDialog> {
       }
 
       try {
+
         final response = await http.get(
           Uri.parse('$_kBaseUrl/pix/verificar-pagamento/$_paymentId'),
         );
@@ -131,17 +129,21 @@ class _PixDialogState extends State<PixDialog> {
         final status = jsonDecode(response.body)['status'];
 
         if (status == 'RECEIVED' || status == 'CONFIRMED') {
+
           _timer?.cancel();
-          if (mounted) Navigator.pop(context, true);
+
+          if (mounted) {
+            Navigator.pop(context, true);
+          }
         }
 
       } catch (_) {}
     });
   }
 
-  // ─────────────────────────────
-  // COPIAR PIX
-  // ─────────────────────────────
+  // =============================
+  // COPIAR
+  // =============================
   Future<void> _copiarPix() async {
 
     if (_pixCopiaCola.isEmpty) return;
@@ -157,9 +159,9 @@ class _PixDialogState extends State<PixDialog> {
     );
   }
 
-  // ─────────────────────────────
+  // =============================
   // UI
-  // ─────────────────────────────
+  // =============================
   @override
   Widget build(BuildContext context) {
 
@@ -185,10 +187,7 @@ class _PixDialogState extends State<PixDialog> {
 
             const Text(
               "PAGAMENTO PIX",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 18,
-              ),
+              style: TextStyle(color: Colors.white70, fontSize: 18),
             ),
 
             const SizedBox(height: 6),
@@ -204,15 +203,11 @@ class _PixDialogState extends State<PixDialog> {
 
             const SizedBox(height: 20),
 
-            // QR
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: Colors.cyanAccent,
-                  width: 2,
-                ),
+                border: Border.all(color: Colors.cyanAccent, width: 2),
               ),
               child: _buildQr(),
             ),
@@ -221,10 +216,7 @@ class _PixDialogState extends State<PixDialog> {
 
             const Text(
               "CÓDIGO PIX",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.white70, fontSize: 12),
             ),
 
             const SizedBox(height: 6),
@@ -232,10 +224,7 @@ class _PixDialogState extends State<PixDialog> {
             SelectableText(
               _pixCopiaCola,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white60,
-                fontSize: 10,
-              ),
+              style: const TextStyle(color: Colors.white60, fontSize: 10),
             ),
 
             const SizedBox(height: 20),
@@ -264,10 +253,7 @@ class _PixDialogState extends State<PixDialog> {
 
             const Text(
               "Aguardando pagamento...",
-              style: TextStyle(
-                color: Colors.white54,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.white54, fontSize: 12),
             ),
           ],
         ),
@@ -275,9 +261,9 @@ class _PixDialogState extends State<PixDialog> {
     );
   }
 
-  // ─────────────────────────────
-  // QR BUILD
-  // ─────────────────────────────
+  // =============================
+  // BUILD QR
+  // =============================
   Widget _buildQr() {
 
     if (_loading) {
@@ -285,10 +271,7 @@ class _PixDialogState extends State<PixDialog> {
         children: [
           CircularProgressIndicator(color: Colors.cyanAccent),
           SizedBox(height: 10),
-          Text(
-            "Gerando PIX...",
-            style: TextStyle(color: Colors.white70),
-          )
+          Text("Gerando PIX...", style: TextStyle(color: Colors.white70)),
         ],
       );
     }
@@ -306,7 +289,7 @@ class _PixDialogState extends State<PixDialog> {
               "Tentar novamente",
               style: TextStyle(color: Colors.cyanAccent),
             ),
-          )
+          ),
         ],
       );
     }
