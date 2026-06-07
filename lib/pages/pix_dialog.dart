@@ -1,11 +1,27 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+
+// ─────────────────────────────
+// CONFIG
+// ─────────────────────────────
+
+const String _kBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'http://10.0.2.2:3000',
+);
+
+const Duration _kHttpTimeout     = Duration(seconds: 60);
+const Duration _kPollingInterval = Duration(seconds: 5);
+const int      _kMaxAttempts     = 60;
+
+// ─────────────────────────────
+// WIDGET
+// ─────────────────────────────
 
 class PixDialog extends StatefulWidget {
   final double valor;
@@ -17,263 +33,292 @@ class PixDialog extends StatefulWidget {
 }
 
 class _PixDialogState extends State<PixDialog> {
-  bool loading = true;
-  bool copiado = false;
 
-  String pix = '';
-  String paymentId = '';
-  Uint8List? qr;
+  bool _loading = true;
+  bool _erro    = false;
 
-  Timer? timer;
-  int tempo = 600;
+  String _pixCopiaCola = '';
+  String _paymentId    = '';
+
+  Uint8List? _qrCodeImage;
+
+  Timer? _timer;
+  int _tentativas = 0;
 
   @override
   void initState() {
     super.initState();
-    gerarPix();
-    iniciarTimer();
+    _gerarPix();
   }
 
   @override
   void dispose() {
-    timer?.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
-  void iniciarTimer() {
-    timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (tempo > 0 && mounted) {
-        setState(() => tempo--);
-      }
+  // ─────────────────────────────
+  // GERAR PIX
+  // ─────────────────────────────
+  Future<void> _gerarPix() async {
+
+    setState(() {
+      _loading = true;
+      _erro = false;
     });
-  }
 
-  String tempoFormatado() {
-    final m = (tempo ~/ 60).toString().padLeft(2, '0');
-    final s = (tempo % 60).toString().padLeft(2, '0');
-    return "$m:$s";
-  }
-
-  Future<void> gerarPix() async {
     try {
-      final res = await http.post(
-        Uri.parse('http://127.0.0.1:3000/criar-pix'),
+      final response = await http.post(
+        Uri.parse('$_kBaseUrl/pix/criar-pix'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'valor': widget.valor,
           'email': 'cliente@gmail.com',
           'nome': 'Antonio',
         }),
-      );
+      ).timeout(_kHttpTimeout);
 
-      final data = jsonDecode(res.body);
+      final data = jsonDecode(response.body);
+
+      if (data['success'] != true) {
+        throw Exception(data['error']);
+      }
+
+      String raw = data['qrCodeBase64'] ?? '';
+      if (raw.contains(',')) raw = raw.split(',').last;
 
       setState(() {
-        pix = data['pixCopiaECola'];
-        paymentId = data['paymentId'];
-        qr = base64Decode(data['qrCodeBase64'].split(',').last);
-        loading = false;
+        _pixCopiaCola = data['pixCopiaECola'] ?? '';
+        _paymentId = data['paymentId'] ?? '';
+        _qrCodeImage = raw.isNotEmpty ? base64Decode(raw) : null;
+
+        _loading = false;
+        _erro = _qrCodeImage == null;
       });
 
-      verificarPagamento();
+      if (_paymentId.isNotEmpty) {
+        _iniciarPolling();
+      }
+
     } catch (e) {
-      setState(() => loading = false);
+
+      setState(() {
+        _loading = false;
+        _erro = true;
+      });
     }
   }
 
-  Future<void> verificarPagamento() async {
-    await Future.delayed(const Duration(seconds: 5));
-  }
+  // ─────────────────────────────
+  // POLLING
+  // ─────────────────────────────
+  void _iniciarPolling() {
 
-  Future<void> copiar() async {
-    await Clipboard.setData(ClipboardData(text: pix));
-    setState(() => copiado = true);
+    _tentativas = 0;
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => copiado = false);
+    _timer = Timer.periodic(_kPollingInterval, (_) async {
+
+      if (++_tentativas > _kMaxAttempts) {
+        _timer?.cancel();
+        return;
+      }
+
+      try {
+        final response = await http.get(
+          Uri.parse('$_kBaseUrl/pix/verificar-pagamento/$_paymentId'),
+        );
+
+        final status = jsonDecode(response.body)['status'];
+
+        if (status == 'RECEIVED' || status == 'CONFIRMED') {
+          _timer?.cancel();
+          if (mounted) Navigator.pop(context, true);
+        }
+
+      } catch (_) {}
     });
   }
 
+  // ─────────────────────────────
+  // COPIAR PIX
+  // ─────────────────────────────
+  Future<void> _copiarPix() async {
+
+    if (_pixCopiaCola.isEmpty) return;
+
+    await Clipboard.setData(
+      ClipboardData(text: _pixCopiaCola),
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('PIX copiado!')),
+    );
+  }
+
+  // ─────────────────────────────
+  // UI
+  // ─────────────────────────────
   @override
   Widget build(BuildContext context) {
+
     return Dialog(
       backgroundColor: Colors.transparent,
       child: Container(
-        padding: const EdgeInsets.all(20),
+        width: 420,
+        padding: const EdgeInsets.all(25),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: RadialGradient(
-            radius: 1.5,
-            center: Alignment.topRight,
-            colors: [
-              Colors.purple.shade900,
-              Colors.black,
-            ],
-          ),
+          color: const Color(0xFF0D0F2B),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.cyanAccent.withOpacity(0.3),
+              blurRadius: 40,
+            ),
+          ],
         ),
-        child: loading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
 
-                  const Icon(Icons.hexagon,
-                      color: Colors.cyanAccent, size: 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
 
-                  const SizedBox(height: 8),
-
-                  const Text("PAGAMENTO",
-                      style: TextStyle(
-                          color: Colors.white70,
-                          letterSpacing: 3)),
-
-                  Text(
-                    "PIX",
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      foreground: Paint()
-                        ..shader = const LinearGradient(
-                          colors: [
-                            Colors.cyanAccent,
-                            Colors.purpleAccent
-                          ],
-                        ).createShader(
-                            const Rect.fromLTWH(0, 0, 200, 70)),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.cyanAccent),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      "R\$ ${widget.valor.toStringAsFixed(2)}",
-                      style: const TextStyle(
-                          color: Colors.cyanAccent,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    children: [
-
-                      /// PASSOS
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text("1. Abra seu banco",
-                                style: TextStyle(color: Colors.white)),
-                            SizedBox(height: 10),
-                            Text("2. Escaneie o QR",
-                                style: TextStyle(color: Colors.white)),
-                            SizedBox(height: 10),
-                            Text("3. Confirme pagamento",
-                                style: TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      /// QR
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          borderRadius:
-                              BorderRadius.circular(16),
-                          border: Border.all(
-                              color: Colors.purpleAccent),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.purpleAccent
-                                  .withOpacity(0.8),
-                              blurRadius: 40,
-                            )
-                          ],
-                        ),
-                        child: qr != null
-                            ? Image.memory(qr!, width: 200)
-                            : const Text("Erro QR"),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      /// SEGURANÇA
-                      Expanded(
-                        child: Column(
-                          children: const [
-                            Icon(Icons.security,
-                                color: Colors.cyanAccent),
-                            SizedBox(height: 10),
-                            Text("Pagamento Seguro",
-                                style:
-                                    TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white24),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      pix.substring(0, pix.length > 60 ? 60 : pix.length),
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: copiar,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.cyanAccent,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: Text(
-                        copiado ? "COPIADO ✅" : "COPIAR CÓDIGO PIX",
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  Text(
-                    tempoFormatado(),
-                    style: const TextStyle(
-                        color: Colors.cyanAccent,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Cancelar pagamento",
-                        style: TextStyle(color: Colors.red)),
-                  ),
-                ],
+            const Text(
+              "PAGAMENTO PIX",
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 18,
               ),
+            ),
+
+            const SizedBox(height: 6),
+
+            Text(
+              "R\$ ${widget.valor.toStringAsFixed(2)}",
+              style: const TextStyle(
+                fontSize: 32,
+                color: Colors.cyanAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // QR
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.cyanAccent,
+                  width: 2,
+                ),
+              ),
+              child: _buildQr(),
+            ),
+
+            const SizedBox(height: 20),
+
+            const Text(
+              "CÓDIGO PIX",
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            SelectableText(
+              _pixCopiaCola,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 10,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _copiarPix,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.cyanAccent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    "COPIAR CÓDIGO PIX",
+                    style: TextStyle(color: Colors.cyanAccent),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            const Text(
+              "Aguardando pagamento...",
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  // ─────────────────────────────
+  // QR BUILD
+  // ─────────────────────────────
+  Widget _buildQr() {
+
+    if (_loading) {
+      return const Column(
+        children: [
+          CircularProgressIndicator(color: Colors.cyanAccent),
+          SizedBox(height: 10),
+          Text(
+            "Gerando PIX...",
+            style: TextStyle(color: Colors.white70),
+          )
+        ],
+      );
+    }
+
+    if (_erro && _qrCodeImage == null) {
+      return Column(
+        children: [
+          const Text(
+            "Erro ao gerar PIX",
+            style: TextStyle(color: Colors.white70),
+          ),
+          TextButton(
+            onPressed: _gerarPix,
+            child: const Text(
+              "Tentar novamente",
+              style: TextStyle(color: Colors.cyanAccent),
+            ),
+          )
+        ],
+      );
+    }
+
+    if (_qrCodeImage != null) {
+      return Image.memory(
+        _qrCodeImage!,
+        width: 210,
+        height: 210,
+      );
+    }
+
+    return const Text("QR indisponível");
   }
 }

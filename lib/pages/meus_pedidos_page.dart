@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 import 'chat_page.dart';
-import 'pix_dialog.dart';
 
 class MeusPedidosPage extends StatefulWidget {
-
   const MeusPedidosPage({super.key});
 
   @override
@@ -16,10 +12,7 @@ class MeusPedidosPage extends StatefulWidget {
       _MeusPedidosPageState();
 }
 
-class _MeusPedidosPageState
-    extends State<MeusPedidosPage> {
-
-  bool loading = false;
+class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
   @override
   Widget build(BuildContext context) {
@@ -28,373 +21,191 @@ class _MeusPedidosPageState
         FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-
       return const Scaffold(
-
         body: Center(
-          child: Text(
-            'Usuário não autenticado',
-          ),
+          child: Text('Usuário não autenticado'),
         ),
       );
     }
 
     return Scaffold(
-
       appBar: AppBar(
         title: const Text('Meus Pedidos'),
       ),
 
-      body: Stack(
-
-        children: [
-
-          StreamBuilder<
-              QuerySnapshot<Map<String, dynamic>>>(
-
-            stream: FirebaseFirestore.instance
-                .collection('requests')
-                .where(
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('requests')
+            .where(
               'clientId',
               isEqualTo: user.uid,
             )
-                .snapshots(),
+            .snapshots(),
 
-            builder: (context, snapshot) {
+        builder: (context, snapshot) {
 
-              if (!snapshot.hasData) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-                return const Center(
-                  child:
-                  CircularProgressIndicator(),
-                );
-              }
+          final docs = snapshot.data!.docs;
 
-              final docs =
-                  snapshot.data!.docs;
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text('Nenhum pedido encontrado'),
+            );
+          }
 
-              if (docs.isEmpty) {
+          return ListView.builder(
+            padding: const EdgeInsets.all(10),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
 
-                return const Center(
-                  child: Text(
-                    'Nenhum pedido encontrado',
-                  ),
-                );
-              }
+              final doc = docs[index];
+              final data = doc.data();
 
-              return ListView.builder(
+              final descricao =
+                  data['description'] ?? '';
 
-                padding:
-                const EdgeInsets.all(10),
-
-                itemCount: docs.length,
-
-                itemBuilder: (
-                    context,
-                    index,
-                    ) {
-
-                  final doc = docs[index];
-
-                  final data = doc.data();
-
-                  final descricao =
-                      data['description'] ?? '';
-
-                  final chatId =
+              final chatId =
                   data['chatId'];
 
-                  final price =
+              final price =
                   data['price'];
 
-                  final pago =
-                      data['paid'] ?? false;
+              final providerId =
+                  data['providerId'];
 
-                  return Card(
+              final confirmado =
+                  data['confirmadoCliente'] ?? false;
 
-                    margin:
-                    const EdgeInsets.only(
-                      bottom: 12,
-                    ),
+              return Card(
+                margin: const EdgeInsets.only(
+                  bottom: 12,
+                ),
 
-                    child: Padding(
-
-                      padding:
+                child: Padding(
+                  padding:
                       const EdgeInsets.all(14),
 
-                      child: Column(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
 
-                        crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                    children: [
 
-                        children: [
-
-                          /*
-                          ==========================
-                          DESCRIÇÃO
-                          ==========================
-                          */
-
-                          Text(
-
-                            descricao,
-
-                            style:
-                            const TextStyle(
-
-                              fontWeight:
+                      Text(
+                        descricao,
+                        style: const TextStyle(
+                          fontWeight:
                               FontWeight.bold,
-                            ),
-                          ),
-
-                          const SizedBox(
-                            height: 10,
-                          ),
-
-                          /*
-                          ==========================
-                          PROFISSIONAL
-                          ==========================
-                          */
-
-                          Text(
-
-                            pago
-
-                                ? 'Profissional: ${data['providerName']}'
-
-                                : 'Profissional: 🔒 bloqueado',
-                          ),
-
-                          const SizedBox(
-                            height: 5,
-                          ),
-
-                          /*
-                          ==========================
-                          VALOR
-                          ==========================
-                          */
-
-                          if (price != null)
-
-                            Text(
-
-                              'Valor: R\$ $price',
-
-                              style:
-                              const TextStyle(
-
-                                color: Colors.green,
-
-                                fontWeight:
-                                FontWeight.bold,
-                              ),
-                            ),
-
-                          const SizedBox(
-                            height: 10,
-                          ),
-
-                          /*
-                          ==========================
-                          BOTÃO PIX
-                          ==========================
-                          */
-
-                          if (!pago)
-
-                            ElevatedButton(
-
-                              onPressed:
-
-                              loading
-
-                                  ? null
-
-                                  : () async {
-
-                                setState(() {
-
-                                  loading = true;
-                                });
-
-                                try {
-
-                                  final response =
-                                  await http.post(
-
-                                    Uri.parse(
-                                      'http://localhost:3000/criar-pix',
-                                    ),
-
-                                    headers: {
-
-                                      'Content-Type':
-                                      'application/json'
-                                    },
-
-                                    body:
-                                    jsonEncode({
-
-                                      'valor':
-                                      price ?? 50,
-
-                                      'email':
-                                      user.email,
-                                    }),
-                                  );
-
-                                  final dataPix =
-                                  jsonDecode(
-                                    response.body,
-                                  );
-
-                                  print(
-                                    "RETORNO BACKEND => $dataPix",
-                                  );
-
-                                  if (dataPix[
-                                  'success'] !=
-                                      true) {
-
-                                    throw Exception(
-                                      dataPix
-                                          .toString(),
-                                    );
-                                  }
-
-                                  // ✅ MOSTRAR PIX NOVO
-                                  showDialog(
-
-                                    context:
-                                    context,
-
-                                    barrierDismissible:
-                                    false,
-
-                                    builder:
-                                        (_) =>
-                                        PixDialog(
-
-                                          valor:
-                                          (price ??
-                                              50)
-                                              .toDouble(),
-                                        ),
-                                  );
-
-                                } catch (e) {
-
-                                  ScaffoldMessenger.of(
-                                      context)
-                                      .showSnackBar(
-
-                                    SnackBar(
-
-                                      content:
-                                      Text(
-                                        'Erro PIX: $e',
-                                      ),
-                                    ),
-                                  );
-
-                                } finally {
-
-                                  setState(() {
-
-                                    loading =
-                                    false;
-                                  });
-                                }
-                              },
-
-                              child: const Text(
-                                'Pagar com PIX 💰',
-                              ),
-                            ),
-
-                          const SizedBox(
-                            height: 10,
-                          ),
-
-                          /*
-                          ==========================
-                          CHAT
-                          ==========================
-                          */
-
-                          if (chatId != null)
-
-                            ElevatedButton(
-
-                              onPressed: () {
-
-                                if (!pago) {
-
-                                  ScaffoldMessenger.of(
-                                      context)
-                                      .showSnackBar(
-
-                                    const SnackBar(
-
-                                      content: Text(
-                                        'Pague antes do chat',
-                                      ),
-                                    ),
-                                  );
-
-                                  return;
-                                }
-
-                                Navigator.push(
-
-                                  context,
-
-                                  MaterialPageRoute(
-
-                                    builder: (_) =>
-                                        ChatPage(
-                                          chatId:
-                                          chatId,
-                                        ),
-                                  ),
-                                );
-                              },
-
-                              child: const Text(
-                                'Abrir chat',
-                              ),
-                            ),
-                        ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+
+                      const SizedBox(height: 10),
+
+                      /// ✅ STATUS PROFISSIONAL
+                      Text(
+                        (providerId == null ||
+                                providerId
+                                    .toString()
+                                    .isEmpty)
+                            ? 'Profissional: 🔒 aguardando'
+                            : 'Profissional em atendimento ✅',
+                      ),
+
+                      const SizedBox(height: 5),
+
+                      /// 💰 VALOR
+                      if (price != null)
+                        Text(
+                          'Valor: R\$ $price',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+
+                      const SizedBox(height: 10),
+
+                      /// ✅ BOTÃO CONFIRMAR VALOR (NOVO)
+                      if (price != null && !confirmado)
+                        ElevatedButton(
+                          onPressed: () async {
+
+                            await FirebaseFirestore.instance
+                                .collection('requests')
+                                .doc(doc.id)
+                                .update({
+                              'confirmadoCliente': true,
+                            });
+
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    "Valor confirmado ✅"),
+                              ),
+                            );
+                          },
+                          child: const Text("Confirmar valor ✅"),
+                        ),
+
+                      /// ✅ MOSTRA CONFIRMADO
+                      if (confirmado)
+                        const Text(
+                          '✅ Valor confirmado',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                      const SizedBox(height: 10),
+
+                      /// 💬 CHAT
+                      if (chatId != null)
+                        ElevatedButton(
+                          onPressed: () {
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ChatPage(
+                                  chatId:
+                                      chatId,
+                                ),
+                              ),
+                            );
+                          },
+                          child:
+                              const Text('Abrir chat 💬'),
+                        ),
+
+                      const SizedBox(height: 10),
+
+                      /// ✅ STATUS FINAL
+                      if (providerId != null)
+                        const Text(
+                          '🛠 Serviço em andamento',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               );
             },
-          ),
-
-          /*
-          ==========================
-          LOADING
-          ==========================
-          */
-
-          if (loading)
-
-            Container(
-
-              color: Colors.black26,
-
-              child: const Center(
-
-                child:
-                CircularProgressIndicator(),
-              ),
-            ),
-        ],
+          );
+        },
       ),
     );
   }

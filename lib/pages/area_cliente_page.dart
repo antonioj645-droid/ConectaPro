@@ -6,6 +6,7 @@ import 'login_page.dart';
 import 'novo_pedido_page.dart';
 import 'meus_pedidos_page.dart';
 import 'perfil_page.dart';
+import 'map_page.dart'; // ✅ IMPORT DO MAPA
 
 class AreaClientePage extends StatefulWidget {
   const AreaClientePage({super.key});
@@ -26,7 +27,6 @@ class _AreaClientePageState extends State<AreaClientePage> {
     _carregarDados();
   }
 
-  // ✅ CARREGAR DADOS
   Future<void> _carregarDados() async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -56,7 +56,6 @@ class _AreaClientePageState extends State<AreaClientePage> {
       });
 
     } catch (e) {
-
       if (!mounted) return;
 
       setState(() {
@@ -67,7 +66,6 @@ class _AreaClientePageState extends State<AreaClientePage> {
     }
   }
 
-  // ✅ LOGOUT
   Future<void> _sair() async {
     await FirebaseAuth.instance.signOut();
 
@@ -79,7 +77,6 @@ class _AreaClientePageState extends State<AreaClientePage> {
     );
   }
 
-  // ✅ VIRAR PROFISSIONAL
   Future<void> _virarProfissional(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -87,15 +84,21 @@ class _AreaClientePageState extends State<AreaClientePage> {
     await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
-        .update({
-      'role': 'profissional',
-    });
+        .update({'role': 'profissional'});
 
     await user.reload();
 
     if (!context.mounted) return;
 
     Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+  }
+
+  // ✅ ABRIR MAPA
+  void _abrirMapa() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MapPage()),
+    );
   }
 
   @override
@@ -131,7 +134,7 @@ class _AreaClientePageState extends State<AreaClientePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ✅ CARD DE BOAS-VINDAS
+            // ✅ BOAS-VINDAS
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -151,6 +154,14 @@ class _AreaClientePageState extends State<AreaClientePage> {
             ),
 
             const SizedBox(height: 20),
+
+            // 🔥 NOVO BOTÃO DO MAPA (DESTAQUE)
+            ListTile(
+              leading: const Icon(Icons.map, color: Colors.green),
+              title: const Text('Ver profissionais no mapa'),
+              subtitle: const Text('Encontre serviços próximos'),
+              onTap: _abrirMapa,
+            ),
 
             // ✅ NOVO PEDIDO
             ListTile(
@@ -184,7 +195,6 @@ class _AreaClientePageState extends State<AreaClientePage> {
 
             const SizedBox(height: 20),
 
-            // ✅ BOTÃO VIRAR PROFISSIONAL
             if (_role != 'profissional')
               SizedBox(
                 width: double.infinity,

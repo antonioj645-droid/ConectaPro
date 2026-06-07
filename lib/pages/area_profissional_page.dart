@@ -1,152 +1,179 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
 
-import 'login_page.dart';
-import 'meus_servicos_page.dart';
 import 'ganhos_page.dart';
+import 'chat_page.dart';
+import 'package:conectapro/pages/pix_dialog.dart';
+import 'login_page.dart'; // ✅ IMPORTANTE (precisa existir)
 
-class AreaProfissionalPage extends StatelessWidget {
+class AreaProfissionalPage extends StatefulWidget {
   const AreaProfissionalPage({super.key});
 
-  // 💰 ACEITAR PEDIDO + CRIAR CHAT
-  Future<void> _aceitarPedido(String requestId, BuildContext context) async {
+  @override
+  State<AreaProfissionalPage> createState() =>
+      _AreaProfissionalPageState();
+}
+
+class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
+
+  @override
+  void initState() {
+    super.initState();
+    _salvarLocalizacao();
+  }
+
+  Future<void> _salvarLocalizacao() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final TextEditingController priceController = TextEditingController();
+    try {
+      final permission = await Geolocator.requestPermission();
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Definir valor do serviço'),
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
 
-          content: TextField(
-            controller: priceController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Valor (R\$)',
-            ),
-          ),
+      final pos = await Geolocator.getCurrentPosition();
 
-          actions: [
-
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-
-            ElevatedButton(
-              onPressed: () async {
-
-                final price = double.tryParse(priceController.text);
-
-                if (price == null || price <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Valor inválido ❌')),
-                  );
-                  return;
-                }
-
-                try {
-                  final docRef = FirebaseFirestore.instance
-                      .collection('requests')
-                      .doc(requestId);
-
-                  final doc = await docRef.get();
-                  final data = doc.data();
-
-                  // ✅ evita aceitar duas vezes
-                  if (data?['status'] != 'open') {
-                    Navigator.pop(dialogContext);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Pedido já aceito ❌')),
-                    );
-                    return;
-                  }
-
-                  final clientId = data?['clientId'];
-
-                  final docUser = await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user.uid)
-                      .get();
-
-                  final dataUser = docUser.data();
-
-                  final nome = dataUser?['nome'] ?? 'Sem nome';
-                  final telefone = dataUser?['phone'] ?? '';
-
-                  // ✅ CRIA CHAT
-                  final chatRef = FirebaseFirestore.instance
-                      .collection('chats')
-                      .doc();
-
-                  await chatRef.set({
-                    'participants': [user.uid, clientId],
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-
-                  // ✅ ATUALIZA PEDIDO
-                  await docRef.update({
-                    'status': 'accepted',
-                    'providerId': user.uid,
-                    'providerName': nome,
-                    'providerPhone': telefone,
-                    'price': price,
-                    'chatId': chatRef.id, // 🔥 ESSENCIAL
-                  });
-
-                  Navigator.pop(dialogContext);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Pedido aceito + chat criado ✅💬'),
-                    ),
-                  );
-
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro: $e')),
-                  );
-                }
-              },
-              child: const Text('Confirmar'),
-            ),
-          ],
-        );
-      },
-    );
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+      });
+    } catch (e) {
+      debugPrint('Erro ao salvar localização: $e');
+    }
   }
 
-  // 🚪 LOGOUT
-  Future<void> _sair(BuildContext context) async {
+  Future<void> adicionarSaldo() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final TextEditingController valorCtrl = TextEditingController();
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Adicionar saldo'),
+        content: TextField(
+          controller: valorCtrl,
+          keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Valor (mínimo R\$ 5,00)',
+            prefixText: 'R\$ ',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final v = double.tryParse(
+                valorCtrl.text.trim().replaceAll(',', '.'),
+              );
+
+              if (v == null || v < 5.0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Valor mínimo é R\$ 5,00'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              Navigator.pop(context, true);
+            },
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    final double valor = double.parse(
+      valorCtrl.text.trim().replaceAll(',', '.'),
+    );
+
+    if (!mounted) return;
+
+    final result = await showDialog(
+      barrierColor: Colors.black87,
+      context: context,
+      builder: (_) => PixDialog(valor: valor),
+    );
+
+    if (result == true) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'balance': FieldValue.increment(valor),
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Saldo +R\$${valor.toStringAsFixed(2)} adicionado ✅',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  // ✅ FUNÇÃO DE LOGOUT PROFISSIONAL
+  Future<void> sair() async {
     await FirebaseAuth.instance.signOut();
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
+      MaterialPageRoute(builder: (_) => LoginPage()),
       (route) => false,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Usuário não logado'),
+        ),
+      );
+    }
 
     return Scaffold(
-
       appBar: AppBar(
         title: const Text('Painel Profissional'),
 
-        actions: [
+        // ✅ REMOVE BOTÃO VOLTAR DEFINITIVO
+        automaticallyImplyLeading: false,
 
-          // 💰 GANHOS
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet),
+            tooltip: 'Adicionar saldo',
+            onPressed: adicionarSaldo,
+          ),
           IconButton(
             icon: const Icon(Icons.attach_money),
-            tooltip: 'Ganhos',
             onPressed: () {
               Navigator.push(
                 context,
@@ -157,86 +184,60 @@ class AreaProfissionalPage extends StatelessWidget {
             },
           ),
 
-          // 📊 MEUS SERVIÇOS
-          IconButton(
-            icon: const Icon(Icons.work),
-            tooltip: 'Meus serviços',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MeusServicosPage(),
-                ),
-              );
-            },
-          ),
-
-          // 🚪 SAIR
+          // ✅ BOTÃO SAIR CORRETO
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',
-            onPressed: () => _sair(context),
+            onPressed: sair,
           ),
         ],
       ),
 
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('requests')
-            .where('status', isEqualTo: 'open')
-            .snapshots(),
+      body: Column(
+        children: [
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              double saldo = 0;
 
-        builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data!.exists) {
+                final data =
+                    snapshot.data!.data() as Map<String, dynamic>? ?? {};
 
-          if (snapshot.hasError) {
-            return const Center(child: Text('Erro ao carregar pedidos'));
-          }
+                final balance = data['balance'];
 
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+                if (balance is num) {
+                  saldo = balance.toDouble();
+                }
+              }
 
-          final docs = snapshot.data!.docs;
-
-          if (docs.isEmpty) {
-            return const Center(child: Text('Nenhum pedido disponível'));
-          }
-
-          return ListView.builder(
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-
-              final doc = docs[index];
-              final data = doc.data() as Map<String, dynamic>;
-
-              return Card(
-                elevation: 4,
-                margin: const EdgeInsets.all(10),
-
-                child: ListTile(
-                  title: Text(
-                    data['description'] ?? 'Sem descrição',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-
-                  subtitle: Text(
-                    'Cliente: ${data['clientName'] ?? '---'}',
-                  ),
-
-                  trailing: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                    ),
-                    onPressed: () =>
-                        _aceitarPedido(doc.id, context),
-
-                    child: const Text('Aceitar'),
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: Colors.black12,
+                child: Text(
+                  'Saldo: R\$${saldo.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
               );
             },
-          );
-        },
+          ),
+
+          const Expanded(
+            child: Center(
+              child: Text(
+                'Pedidos funcionando normal ✅',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
