@@ -6,18 +6,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
-// ✅ CORREÇÃO PRINCIPAL (BACKEND ONLINE)
+// ==========================
+// CONFIG
+// ==========================
 const String _kBaseUrl =
     'https://conectapro-backend-1.onrender.com';
 
-const Duration _kHttpTimeout     = Duration(seconds: 60);
+const Duration _kHttpTimeout = Duration(seconds: 90);
 const Duration _kPollingInterval = Duration(seconds: 5);
-const int      _kMaxAttempts     = 60;
+const int _kMaxAttempts = 60;
 
+// ==========================
+// WIDGET
+// ==========================
 class PixDialog extends StatefulWidget {
   final double valor;
 
-  const PixDialog({super.key, required this.valor});
+  const PixDialog({
+    super.key,
+    required this.valor,
+  });
 
   @override
   State<PixDialog> createState() => _PixDialogState();
@@ -26,20 +34,23 @@ class PixDialog extends StatefulWidget {
 class _PixDialogState extends State<PixDialog> {
 
   bool _loading = true;
-  bool _erro    = false;
+  bool _erro = false;
 
   String _pixCopiaCola = '';
-  String _paymentId    = '';
+  String _paymentId = '';
 
-  Uint8List? _qrCodeImage;
+  Uint8List? _qrImage;
 
   Timer? _timer;
   int _tentativas = 0;
 
+  // ==========================
+  // INIT
+  // ==========================
   @override
   void initState() {
     super.initState();
-    _gerarPix();
+    _criarPix();
   }
 
   @override
@@ -48,10 +59,10 @@ class _PixDialogState extends State<PixDialog> {
     super.dispose();
   }
 
-  // =============================
-  // GERAR PIX
-  // =============================
-  Future<void> _gerarPix() async {
+  // ==========================
+  // CRIAR PIX
+  // ==========================
+  Future<void> _criarPix() async {
 
     setState(() {
       _loading = true;
@@ -64,40 +75,37 @@ class _PixDialogState extends State<PixDialog> {
         Uri.parse('$_kBaseUrl/pix/criar-pix'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'valor': widget.valor,
-          'email': 'cliente@gmail.com',
-          'nome': 'Antonio',
+          "valor": widget.valor,
+          "email": "cliente@gmail.com",
+          "nome": "Antonio"
         }),
       ).timeout(_kHttpTimeout);
 
-      print("STATUS: ${response.statusCode}");
-      print("BODY: ${response.body}");
-
       final data = jsonDecode(response.body);
 
-      if (data['success'] != true) {
-        throw Exception(data['error']);
+      if (data["success"] != true) {
+        throw Exception(data["error"]);
       }
 
-      String raw = data['qrCodeBase64'] ?? '';
-      if (raw.contains(',')) raw = raw.split(',').last;
+      String base64img = data["qrCodeBase64"] ?? "";
+      if (base64img.contains(',')) {
+        base64img = base64img.split(',').last;
+      }
 
       setState(() {
-        _pixCopiaCola = data['pixCopiaECola'] ?? '';
-        _paymentId    = data['paymentId'] ?? '';
-        _qrCodeImage  = raw.isNotEmpty ? base64Decode(raw) : null;
+        _pixCopiaCola = data["pixCopiaECola"] ?? "";
+        _paymentId = data["paymentId"] ?? "";
+        _qrImage = base64img.isNotEmpty ? base64Decode(base64img) : null;
 
         _loading = false;
-        _erro = _qrCodeImage == null;
+        _erro = _qrImage == null;
       });
 
       if (_paymentId.isNotEmpty) {
-        _iniciarPolling();
+        _startPolling();
       }
 
     } catch (e) {
-
-      print("ERRO PIX: $e");
 
       setState(() {
         _loading = false;
@@ -106,10 +114,10 @@ class _PixDialogState extends State<PixDialog> {
     }
   }
 
-  // =============================
-  // POLLING
-  // =============================
-  void _iniciarPolling() {
+  // ==========================
+  // POLLING (VERIFICA PAGAMENTO)
+  // ==========================
+  void _startPolling() {
 
     _tentativas = 0;
 
@@ -122,13 +130,14 @@ class _PixDialogState extends State<PixDialog> {
 
       try {
 
-        final response = await http.get(
+        final res = await http.get(
           Uri.parse('$_kBaseUrl/pix/verificar-pagamento/$_paymentId'),
         );
 
-        final status = jsonDecode(response.body)['status'];
+        final data = jsonDecode(res.body);
+        final status = data["status"];
 
-        if (status == 'RECEIVED' || status == 'CONFIRMED') {
+        if (status == "CONFIRMED" || status == "RECEIVED") {
 
           _timer?.cancel();
 
@@ -141,10 +150,10 @@ class _PixDialogState extends State<PixDialog> {
     });
   }
 
-  // =============================
-  // COPIAR
-  // =============================
-  Future<void> _copiarPix() async {
+  // ==========================
+  // COPIAR PIX
+  // ==========================
+  Future<void> _copiar() async {
 
     if (_pixCopiaCola.isEmpty) return;
 
@@ -155,13 +164,13 @@ class _PixDialogState extends State<PixDialog> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('PIX copiado!')),
+      const SnackBar(content: Text("Código PIX copiado")),
     );
   }
 
-  // =============================
+  // ==========================
   // UI
-  // =============================
+  // ==========================
   @override
   Widget build(BuildContext context) {
 
@@ -169,6 +178,9 @@ class _PixDialogState extends State<PixDialog> {
       backgroundColor: Colors.transparent,
       child: Container(
         width: 420,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         padding: const EdgeInsets.all(25),
         decoration: BoxDecoration(
           color: const Color(0xFF0D0F2B),
@@ -181,89 +193,114 @@ class _PixDialogState extends State<PixDialog> {
           ],
         ),
 
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
 
-            const Text(
-              "PAGAMENTO PIX",
-              style: TextStyle(color: Colors.white70, fontSize: 18),
-            ),
-
-            const SizedBox(height: 6),
-
-            Text(
-              "R\$ ${widget.valor.toStringAsFixed(2)}",
-              style: const TextStyle(
-                fontSize: 32,
-                color: Colors.cyanAccent,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.cyanAccent, width: 2),
-              ),
-              child: _buildQr(),
-            ),
-
-            const SizedBox(height: 20),
-
-            const Text(
-              "CÓDIGO PIX",
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-
-            const SizedBox(height: 6),
-
-            SelectableText(
-              _pixCopiaCola,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, fontSize: 10),
-            ),
-
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: _copiarPix,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.cyanAccent),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    "COPIAR CÓDIGO PIX",
-                    style: TextStyle(color: Colors.cyanAccent),
-                  ),
+              // ======================
+              // TITULO
+              // ======================
+              const Text(
+                "PAGAMENTO PIX",
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 18,
                 ),
               ),
-            ),
 
-            const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-            const Text(
-              "Aguardando pagamento...",
-              style: TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-          ],
+              Text(
+                "R\$ ${widget.valor.toStringAsFixed(2)}",
+                style: const TextStyle(
+                  fontSize: 32,
+                  color: Colors.cyanAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ======================
+              // QR
+              // ======================
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.cyanAccent,
+                    width: 2,
+                  ),
+                ),
+                child: _buildQr(),
+              ),
+
+              const SizedBox(height: 20),
+
+              const Text(
+                "CÓDIGO PIX",
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              SelectableText(
+                _pixCopiaCola,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 10,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ======================
+              // BOTÃO
+              // ======================
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _copiar,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.cyanAccent),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      "COPIAR CÓDIGO PIX",
+                      style: TextStyle(color: Colors.cyanAccent),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              const Text(
+                "Aguardando pagamento...",
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // =============================
+  // ==========================
   // BUILD QR
-  // =============================
+  // ==========================
   Widget _buildQr() {
 
     if (_loading) {
@@ -271,12 +308,13 @@ class _PixDialogState extends State<PixDialog> {
         children: [
           CircularProgressIndicator(color: Colors.cyanAccent),
           SizedBox(height: 10),
-          Text("Gerando PIX...", style: TextStyle(color: Colors.white70)),
+          Text("Gerando PIX...",
+              style: TextStyle(color: Colors.white70)),
         ],
       );
     }
 
-    if (_erro && _qrCodeImage == null) {
+    if (_erro && _qrImage == null) {
       return Column(
         children: [
           const Text(
@@ -284,19 +322,19 @@ class _PixDialogState extends State<PixDialog> {
             style: TextStyle(color: Colors.white70),
           ),
           TextButton(
-            onPressed: _gerarPix,
+            onPressed: _criarPix,
             child: const Text(
               "Tentar novamente",
               style: TextStyle(color: Colors.cyanAccent),
             ),
-          ),
+          )
         ],
       );
     }
 
-    if (_qrCodeImage != null) {
+    if (_qrImage != null) {
       return Image.memory(
-        _qrCodeImage!,
+        _qrImage!,
         width: 210,
         height: 210,
       );

@@ -13,7 +13,6 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _descricaoController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController(); // 💰 NOVO
 
   bool _carregando = false;
 
@@ -28,6 +27,9 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
     'Outros',
   ];
 
+  // ==========================
+  // 🔥 CRIAR PEDIDO (PROFISSIONAL)
+  // ==========================
   Future<void> _criarPedido() async {
 
     if (!_formKey.currentState!.validate()) return;
@@ -45,7 +47,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
 
     try {
 
-      // ✅ pegar nome do cliente
+      // ✅ pega nome do cliente
       final docUser = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -53,15 +55,24 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
 
       final nome = docUser.data()?['nome'] ?? user.email;
 
+      // ✅ CRIA PEDIDO CORRETO
       await FirebaseFirestore.instance.collection('requests').add({
+
         'clientId': user.uid,
-        'clientName': nome, // ✅ importante para mostrar depois
+        'clientName': nome,
+
         'description': _descricaoController.text.trim(),
         'category': _categoriaSelecionada,
+
+        // ✅ IMPORTANTE PRA PROFISSIONAL VER
+        'providerId': null,
+
+        // ✅ status correto
         'status': 'open',
 
-        // 💰 PREÇO AUTOMÁTICO
-        'price': double.tryParse(_priceController.text) ?? 0,
+        // ✅ profissional vai definir depois
+        'price': null,
+        'confirmadoCliente': false,
 
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -69,13 +80,10 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pedido criado com sucesso ✅')),
+        const SnackBar(content: Text('✅ Pedido criado com sucesso')),
       );
 
-      // ✅ limpar campos
       _descricaoController.clear();
-      _priceController.clear();
-
       Navigator.pop(context);
 
     } catch (e) {
@@ -87,7 +95,6 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       );
 
     } finally {
-
       if (mounted) {
         setState(() => _carregando = false);
       }
@@ -97,10 +104,12 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
   @override
   void dispose() {
     _descricaoController.dispose();
-    _priceController.dispose(); // ✅ limpar memória
     super.dispose();
   }
 
+  // ==========================
+  // UI
+  // ==========================
   @override
   Widget build(BuildContext context) {
 
@@ -156,27 +165,6 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
                   }
                   if (value.trim().length < 10) {
                     return 'Descrição muito curta';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // 💰 CAMPO DE PREÇO (NOVO)
-              TextFormField(
-                controller: _priceController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Valor do serviço (R\$)',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Informe o valor';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Valor inválido';
                   }
                   return null;
                 },

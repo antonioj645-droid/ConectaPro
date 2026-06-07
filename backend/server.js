@@ -43,8 +43,12 @@ try {
 // =========================
 const pixRoutes = require('./routes/pix');
 
-// ✅ prefixo correto
+// ✅ SUA ROTA PIX (MANTIDA)
 app.use('/pix', pixRoutes);
+
+// ✅ ✅ ADICIONADO (NÃO EXISTIA)
+const carteiraRoutes = require('./routes/carteira');
+app.use('/carteira', carteiraRoutes);
 
 // =========================
 // ✅ ROTA TESTE

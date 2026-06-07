@@ -1,24 +1,88 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
 import 'chat_page.dart';
+import 'pix_dialog.dart';
 
 class MeusPedidosPage extends StatefulWidget {
   const MeusPedidosPage({super.key});
 
   @override
-  State<MeusPedidosPage> createState() =>
-      _MeusPedidosPageState();
+  State<MeusPedidosPage> createState() => _MeusPedidosPageState();
 }
 
 class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
+  // ===========================
+  // 🔥 DESBLOQUEAR PEDIDO COMPLETO
+  // ===========================
+  Future<void> desbloquearPedidoCompleto(
+    BuildContext context,
+    String userId,
+    String pedidoId,
+    String? chatId,
+  ) async {
+
+    // ✅ ABRE PIX
+    final pagou = await showDialog(
+      context: context,
+      builder: (_) => const PixDialog(valor: 3),
+    );
+
+    if (pagou != true) return;
+
+    try {
+
+      final response = await http.post(
+        Uri.parse(
+          'https://conectapro-backend-1.onrender.com/carteira/desbloquear',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "userId": userId,
+          "pedidoId": pedidoId,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (data["success"] == true) {
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✅ Pedido desbloqueado"),
+          ),
+        );
+
+        // ✅ ABRE CHAT
+        if (chatId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatPage(chatId: chatId),
+            ),
+          );
+        }
+
+      } else {
+        throw Exception(data["error"]);
+      }
+
+    } catch (e) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erro: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
 
-    final user =
-        FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       return const Scaffold(
@@ -32,17 +96,11 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
       appBar: AppBar(
         title: const Text('Meus Pedidos'),
       ),
-
-      body: StreamBuilder<
-          QuerySnapshot<Map<String, dynamic>>>(
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('requests')
-            .where(
-              'clientId',
-              isEqualTo: user.uid,
-            )
+            .where('clientId', isEqualTo: user.uid)
             .snapshots(),
-
         builder: (context, snapshot) {
 
           if (!snapshot.hasData) {
@@ -67,41 +125,26 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
               final doc = docs[index];
               final data = doc.data();
 
-              final descricao =
-                  data['description'] ?? '';
-
-              final chatId =
-                  data['chatId'];
-
-              final price =
-                  data['price'];
-
-              final providerId =
-                  data['providerId'];
-
+              final descricao = data['description'] ?? '';
+              final chatId = data['chatId'];
+              final price = data['price'];
+              final providerId = data['providerId'];
               final confirmado =
                   data['confirmadoCliente'] ?? false;
 
               return Card(
-                margin: const EdgeInsets.only(
-                  bottom: 12,
-                ),
-
+                margin: const EdgeInsets.only(bottom: 12),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.all(14),
-
+                  padding: const EdgeInsets.all(14),
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
+                      /// ✅ DESCRIÇÃO
                       Text(
                         descricao,
                         style: const TextStyle(
-                          fontWeight:
-                              FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
 
@@ -110,9 +153,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                       /// ✅ STATUS PROFISSIONAL
                       Text(
                         (providerId == null ||
-                                providerId
-                                    .toString()
-                                    .isEmpty)
+                                providerId.toString().isEmpty)
                             ? 'Profissional: 🔒 aguardando'
                             : 'Profissional em atendimento ✅',
                       ),
@@ -125,14 +166,13 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                           'Valor: R\$ $price',
                           style: const TextStyle(
                             color: Colors.green,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
 
                       const SizedBox(height: 10),
 
-                      /// ✅ BOTÃO CONFIRMAR VALOR (NOVO)
+                      /// ✅ CONFIRMAR VALOR
                       if (price != null && !confirmado)
                         ElevatedButton(
                           onPressed: () async {
@@ -147,15 +187,14 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                             ScaffoldMessenger.of(context)
                                 .showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                    "Valor confirmado ✅"),
+                                content:
+                                    Text("Valor confirmado ✅"),
                               ),
                             );
                           },
                           child: const Text("Confirmar valor ✅"),
                         ),
 
-                      /// ✅ MOSTRA CONFIRMADO
                       if (confirmado)
                         const Text(
                           '✅ Valor confirmado',
@@ -167,24 +206,20 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// 💬 CHAT
-                      if (chatId != null)
+                      /// 🔒 LIBERA CHAT SÓ SE PAGAR
+                      if (providerId != null)
                         ElevatedButton(
                           onPressed: () {
-
-                            Navigator.push(
+                            desbloquearPedidoCompleto(
                               context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ChatPage(
-                                  chatId:
-                                      chatId,
-                                ),
-                              ),
+                              user.uid,
+                              doc.id,
+                              chatId,
                             );
                           },
-                          child:
-                              const Text('Abrir chat 💬'),
+                          child: const Text(
+                            'Desbloquear e abrir chat 🔓💬',
+                          ),
                         ),
 
                       const SizedBox(height: 10),
@@ -195,8 +230,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                           '🛠 Serviço em andamento',
                           style: TextStyle(
                             color: Colors.orange,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                     ],
