@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'chat_page.dart';
 import 'pix_dialog.dart';
-import 'meus_servicos_page.dart'; // ✅ NOVO IMPORT
+import 'meus_servicos_page.dart';
 
 class AreaProfissionalPage extends StatefulWidget {
   const AreaProfissionalPage({Key? key}) : super(key: key);
@@ -52,9 +52,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     } catch (_) {}
   }
 
-  // ======================
-  // ✅ DESBLOQUEAR PEDIDO
-  // ======================
   Future<void> desbloquearPedido(
     String pedidoId,
     String? chatId,
@@ -126,10 +123,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
           if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Pedido aceito ✅")),
-          );
-
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -139,61 +132,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         }
 
         return;
-      }
-
-      // ✅ PIX
-      final pagou = await showDialog(
-        context: context,
-        builder: (_) => const PixDialog(valor: 3),
-      );
-
-      if (pagou != true) return;
-
-      await Future.delayed(const Duration(seconds: 5));
-
-      final novoDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      final novoSaldo =
-          ((novoDoc.data()?['balance'] ?? 0) as num).toDouble();
-
-      if (novoSaldo >= 3) {
-
-        await FirebaseFirestore.instance
-            .collection('requests')
-            .doc(pedidoId)
-            .update({
-          'providerId': user.uid,
-          'status': 'aceito',
-          'acceptedAt': FieldValue.serverTimestamp(),
-        });
-
-        setState(() {});
-
-        final chatFinal =
-            (chatId != null && chatId.toString().isNotEmpty)
-                ? chatId
-                : pedidoId;
-
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatPage(chatId: chatFinal),
-            ),
-          );
-        }
-
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Pagamento não confirmado"),
-            ),
-          );
-        }
       }
 
     } catch (e) {
@@ -209,9 +147,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     }
   }
 
-  // ======================
-  // UI
-  // ======================
   @override
   Widget build(BuildContext context) {
 
@@ -229,10 +164,8 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
         actions: [
 
-          // ✅ NOVO BOTÃO (MEUS SERVIÇOS)
           IconButton(
             icon: const Icon(Icons.work),
-            tooltip: "Meus serviços",
             onPressed: () {
               Navigator.push(
                 context,
@@ -251,16 +184,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           ),
 
           IconButton(
-            icon: const Icon(Icons.account_balance_wallet),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => const PixDialog(valor: 10),
-              );
-            },
-          ),
-
-          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -274,23 +197,19 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
       body: Column(
         children: [
 
-          // ✅ SALDO
           StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
                 .snapshots(),
             builder: (context, snapshot) {
+
               double saldo = 0;
 
               if (snapshot.hasData && snapshot.data!.exists) {
                 final data =
                     snapshot.data!.data() as Map<String, dynamic>;
-                final balance = data['balance'];
-
-                if (balance is num) {
-                  saldo = balance.toDouble();
-                }
+                saldo = ((data['balance'] ?? 0) as num).toDouble();
               }
 
               return Container(
@@ -304,7 +223,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
-          // ✅ PEDIDOS DISPONÍVEIS
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -313,30 +231,29 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
               builder: (context, snapshot) {
 
                 if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const Center(child: CircularProgressIndicator());
                 }
 
-                final docs = snapshot.data!.docs.where((doc) {
-                  final data =
-                      doc.data() as Map<String, dynamic>;
+                final docsTodos = snapshot.data!.docs;
+
+                // ✅ TRAVA PRINCIPAL
+                final temServicoAtivo = docsTodos.any((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  return data['providerId'] == user.uid &&
+                         data['status'] == 'aceito';
+                });
+
+                final docs = docsTodos.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
                   return data['providerId'] == null;
                 }).toList();
-
-                if (docs.isEmpty) {
-                  return const Center(
-                    child: Text('Nenhum pedido disponível'),
-                  );
-                }
 
                 return ListView.builder(
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
 
                     final doc = docs[index];
-                    final data =
-                        doc.data() as Map<String, dynamic>;
+                    final data = doc.data() as Map<String, dynamic>;
 
                     final carregando =
                         _processandoPedidos.contains(doc.id);
@@ -362,7 +279,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: carregando
+                                onPressed: (carregando || temServicoAtivo)
                                     ? null
                                     : () {
                                         desbloquearPedido(
@@ -372,7 +289,11 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                                       },
                                 child: carregando
                                     ? const CircularProgressIndicator()
-                                    : const Text("Pegar pedido (R\$3)"),
+                                    : Text(
+                                        temServicoAtivo
+                                            ? "Finalize seu serviço primeiro"
+                                            : "Pegar pedido (R\$3)",
+                                      ),
                               ),
                             ),
                           ],

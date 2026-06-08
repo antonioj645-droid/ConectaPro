@@ -1,116 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'chat_page.dart';
-import 'package:conectapro/pages/pix_dialog.dart';
 
 class MeusServicosPage extends StatelessWidget {
   const MeusServicosPage({super.key});
-
-  Future<void> _finalizarServico(
-      String requestId, BuildContext context) async {
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final requestRef = FirebaseFirestore.instance
-        .collection('requests')
-        .doc(requestId);
-
-    final reqDoc = await requestRef.get();
-    final data = reqDoc.data();
-
-    final price = (data?['price'] ?? 0).toDouble();
-    final taxa = price * 0.07;
-
-    final userRef =
-        FirebaseFirestore.instance.collection('users').doc(user.uid);
-
-    final userDoc = await userRef.get();
-    double saldo = (userDoc['balance'] ?? 0).toDouble();
-
-    if (saldo < taxa) {
-      showDialog(
-        context: context,
-        builder: (_) {
-          return AlertDialog(
-            title: const Text("Finalizar serviço"),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                    "Para concluir, pague a taxa da plataforma"),
-                const SizedBox(height: 10),
-                Text(
-                  "Taxa: R\$${taxa.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancelar"),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-
-                  Navigator.pop(context);
-
-                  final pago = await showDialog(
-                    context: context,
-                    builder: (_) => PixDialog(valor: taxa),
-                  );
-
-                  if (pago == true) {
-                    await userRef.update({
-                      'balance': FieldValue.increment(taxa),
-                    });
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("Saldo adicionado ✅")),
-                    );
-                  }
-                },
-                child: const Text("Pagar com PIX"),
-              ),
-            ],
-          );
-        },
-      );
-
-      return;
-    }
-
-    await userRef.update({
-      'balance': FieldValue.increment(-taxa),
-    });
-
-    await requestRef.update({
-      'status': 'completed',
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Serviço finalizado ✅")),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
 
     final user = FirebaseAuth.instance.currentUser;
 
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text("Não logado")),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Meus Serviços')),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      appBar: AppBar(
+        title: const Text("Meus Serviços"),
+      ),
+
+      body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('requests')
-            .where('providerId', isEqualTo: user?.uid)
+            .where('providerId', isEqualTo: user.uid)
             .snapshots(),
         builder: (context, snapshot) {
 
@@ -122,7 +37,7 @@ class MeusServicosPage extends StatelessWidget {
 
           if (docs.isEmpty) {
             return const Center(
-              child: Text('Sem serviços'),
+              child: Text("Nenhum serviço em andamento"),
             );
           }
 
@@ -131,42 +46,137 @@ class MeusServicosPage extends StatelessWidget {
             itemBuilder: (context, index) {
 
               final doc = docs[index];
-              final data = doc.data();
+              final data = doc.data() as Map<String, dynamic>;
 
-              final status = data['status'];
+              final descricao = data['description'] ?? '';
               final chatId = data['chatId'];
 
               return Card(
                 margin: const EdgeInsets.all(10),
-                child: ListTile(
-                  title: Text(data['description'] ?? ''),
-                  subtitle: Text("Cliente: ${data['clientName']}"),
-
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     children: [
 
-                      if (chatId != null)
-                        IconButton(
-                          icon: const Icon(Icons.chat),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ChatPage(chatId: chatId),
-                              ),
-                            );
-                          },
+                      /// ✅ DESCRIÇÃO
+                      Text(
+                        descricao,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
 
-                      if (status == 'accepted')
-                        IconButton(
-                          icon: const Icon(Icons.check,
-                              color: Colors.green),
-                          onPressed: () =>
-                              _finalizarServico(doc.id, context),
+                      const SizedBox(height: 10),
+
+                      /// ✅ ABRIR CHAT
+                      ElevatedButton(
+                        onPressed: () {
+
+                          if (chatId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Chat não disponível")),
+                            );
+                            return;
+                          }
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatPage(chatId: chatId),
+                            ),
+                          );
+                        },
+                        child: const Text("Abrir chat 💬"),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      /// ✅ FINALIZAR SERVIÇO
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
                         ),
+                        onPressed: () {
+
+                          final controller = TextEditingController();
+
+                          showDialog(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text("Finalizar serviço"),
+                              content: TextField(
+                                controller: controller,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: "Valor do serviço",
+                                ),
+                              ),
+                              actions: [
+
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text("Cancelar"),
+                                ),
+
+                                ElevatedButton(
+                                  onPressed: () async {
+
+                                    final valor = double.tryParse(controller.text);
+
+                                    if (valor == null || valor <= 0) return;
+
+                                    final comissao = valor * 0.07;
+
+                                    // ✅ DESCONTAR COMISSÃO
+                                    final userRef = FirebaseFirestore.instance
+                                        .collection("users")
+                                        .doc(user.uid);
+
+                                    final userDoc = await userRef.get();
+                                    final saldo =
+                                        ((userDoc.data()?["balance"] ?? 0) as num)
+                                            .toDouble();
+
+                                    if (saldo < comissao) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text("Saldo insuficiente para comissão"),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    await userRef.update({
+                                      "balance": saldo - comissao
+                                    });
+
+                                    // ✅ FINALIZA PEDIDO
+                                    await FirebaseFirestore.instance
+                                        .collection("requests")
+                                        .doc(doc.id)
+                                        .update({
+                                      "status": "finalizado",
+                                      "valorFinal": valor,
+                                      "finishedAt": FieldValue.serverTimestamp(),
+                                    });
+
+                                    Navigator.pop(context);
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            "Serviço finalizado ✅ Comissão: R\$${comissao.toStringAsFixed(2)}"),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text("Finalizar"),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        child: const Text("Finalizar serviço 💰"),
+                      ),
                     ],
                   ),
                 ),
