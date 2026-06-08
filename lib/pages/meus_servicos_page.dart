@@ -26,6 +26,7 @@ class MeusServicosPage extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('requests')
             .where('providerId', isEqualTo: user.uid)
+            .where('status', isNotEqualTo: 'finalizado') // ✅ CORREÇÃO AQUI
             .snapshots(),
         builder: (context, snapshot) {
 
@@ -127,7 +128,6 @@ class MeusServicosPage extends StatelessWidget {
 
                                     final comissao = valor * 0.07;
 
-                                    // ✅ DESCONTAR COMISSÃO
                                     final userRef = FirebaseFirestore.instance
                                         .collection("users")
                                         .doc(user.uid);
@@ -150,7 +150,6 @@ class MeusServicosPage extends StatelessWidget {
                                       "balance": saldo - comissao
                                     });
 
-                                    // ✅ FINALIZA PEDIDO
                                     await FirebaseFirestore.instance
                                         .collection("requests")
                                         .doc(doc.id)
