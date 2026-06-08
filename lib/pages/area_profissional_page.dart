@@ -1,17 +1,17 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
-import 'ganhos_page.dart';
 import 'chat_page.dart';
 import 'pix_dialog.dart';
-import 'login_page.dart';
+import 'meus_servicos_page.dart'; // ✅ NOVO IMPORT
 
 class AreaProfissionalPage extends StatefulWidget {
-  const AreaProfissionalPage({super.key});
+  const AreaProfissionalPage({Key? key}) : super(key: key);
 
   @override
   State<AreaProfissionalPage> createState() =>
@@ -19,6 +19,8 @@ class AreaProfissionalPage extends StatefulWidget {
 }
 
 class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
+
+  final Set<String> _processandoPedidos = {};
 
   @override
   void initState() {
@@ -50,77 +52,25 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     } catch (_) {}
   }
 
-  Future<void> adicionarSaldo() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final TextEditingController valorCtrl = TextEditingController();
-
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Adicionar saldo'),
-        content: TextField(
-          controller: valorCtrl,
-          keyboardType:
-              const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Valor (mínimo R\$ 5,00)',
-            prefixText: 'R\$ ',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
-            child: const Text('Continuar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar != true) return;
-
-    final double valor = double.parse(
-      valorCtrl.text.trim().replaceAll(',', '.'),
-    );
-
-    final result = await showDialog(
-      context: context,
-      builder: (_) => PixDialog(valor: valor),
-    );
-
-    if (result == true) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-        'balance': FieldValue.increment(valor),
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Saldo +R\$${valor.toStringAsFixed(2)} adicionado ✅',
-          ),
-        ),
-      );
-    }
-  }
-
+  // ======================
+  // ✅ DESBLOQUEAR PEDIDO
+  // ======================
   Future<void> desbloquearPedido(
     String pedidoId,
     String? chatId,
   ) async {
 
+    if (_processandoPedidos.contains(pedidoId)) return;
+
+    setState(() {
+      _processandoPedidos.add(pedidoId);
+    });
+
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      setState(() => _processandoPedidos.remove(pedidoId));
+      return;
+    }
 
     try {
 
@@ -129,38 +79,29 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           .doc(user.uid)
           .get();
 
-      final dataUser =
-          docUser.data() as Map<String, dynamic>? ?? {};
-
-      final balance = dataUser['balance'];
-      final saldo = balance is num ? balance.toDouble() : 0.0;
+      final saldo =
+          ((docUser.data()?['balance'] ?? 0) as num).toDouble();
 
       if (saldo >= 3) {
 
+        final uri = Uri.https(
+          'conectapro-backend-1.onrender.com',
+          '/carteira/desbloquear',
+        );
+
         final response = await http.post(
-          Uri.parse(
-            'https://conectapro-backend-1.onrender.com/carteira/desbloquear',
-          ),
-          headers: {'Content-Type': 'application/json'},
+          uri,
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: jsonEncode({
             "userId": user.uid,
             "pedidoId": pedidoId,
           }),
         );
 
-        // ✅ DEBUG PROFISSIONAL
-        print("STATUS: ${response.statusCode}");
-        print("BODY: ${response.body}");
-
-        // ✅ PROTEÇÃO CONTRA ERRO
         if (response.statusCode != 200) {
-          throw Exception(
-            "Erro servidor ${response.statusCode}\n${response.body}",
-          );
-        }
-
-        if (!response.body.trim().startsWith('{')) {
-          throw Exception("Resposta inválida do servidor");
+          throw Exception(response.body);
         }
 
         final data = jsonDecode(response.body);
@@ -176,23 +117,31 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             'acceptedAt': FieldValue.serverTimestamp(),
           });
 
+          setState(() {});
+
+          final chatFinal =
+              (chatId != null && chatId.toString().isNotEmpty)
+                  ? chatId
+                  : pedidoId;
+
+          if (!mounted) return;
+
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Pedido liberado ✅")),
+            const SnackBar(content: Text("Pedido aceito ✅")),
           );
 
-          if (chatId != null && mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatPage(chatId: chatId),
-              ),
-            );
-          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatPage(chatId: chatFinal),
+            ),
+          );
         }
 
         return;
       }
 
+      // ✅ PIX
       final pagou = await showDialog(
         context: context,
         builder: (_) => const PixDialog(valor: 3),
@@ -200,31 +149,69 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
       if (pagou != true) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Pagamento confirmado ✅"),
-        ),
-      );
+      await Future.delayed(const Duration(seconds: 5));
+
+      final novoDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final novoSaldo =
+          ((novoDoc.data()?['balance'] ?? 0) as num).toDouble();
+
+      if (novoSaldo >= 3) {
+
+        await FirebaseFirestore.instance
+            .collection('requests')
+            .doc(pedidoId)
+            .update({
+          'providerId': user.uid,
+          'status': 'aceito',
+          'acceptedAt': FieldValue.serverTimestamp(),
+        });
+
+        setState(() {});
+
+        final chatFinal =
+            (chatId != null && chatId.toString().isNotEmpty)
+                ? chatId
+                : pedidoId;
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatPage(chatId: chatFinal),
+            ),
+          );
+        }
+
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Pagamento não confirmado"),
+            ),
+          );
+        }
+      }
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro: $e")),
+        );
+      }
+    } finally {
+      setState(() {
+        _processandoPedidos.remove(pedidoId);
+      });
     }
   }
 
-  Future<void> sair() async {
-    await FirebaseAuth.instance.signOut();
-
-    if (!mounted) return;
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
-    );
-  }
-
+  // ======================
+  // UI
+  // ======================
   @override
   Widget build(BuildContext context) {
 
@@ -239,30 +226,47 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Painel Profissional'),
-        automaticallyImplyLeading: false,
+
         actions: [
 
+          // ✅ NOVO BOTÃO (MEUS SERVIÇOS)
           IconButton(
-            icon: const Icon(Icons.account_balance_wallet),
-            tooltip: 'Adicionar saldo',
-            onPressed: adicionarSaldo,
-          ),
-
-          IconButton(
-            icon: const Icon(Icons.attach_money),
+            icon: const Icon(Icons.work),
+            tooltip: "Meus serviços",
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const GanhosPage(),
+                  builder: (_) => const MeusServicosPage(),
                 ),
               );
             },
           ),
 
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {});
+            },
+          ),
+
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => const PixDialog(valor: 10),
+              );
+            },
+          ),
+
+          IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: sair,
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (!mounted) return;
+              Navigator.pop(context);
+            },
           ),
         ],
       ),
@@ -270,13 +274,13 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
       body: Column(
         children: [
 
+          // ✅ SALDO
           StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
                 .snapshots(),
             builder: (context, snapshot) {
-
               double saldo = 0;
 
               if (snapshot.hasData && snapshot.data!.exists) {
@@ -300,11 +304,11 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
+          // ✅ PEDIDOS DISPONÍVEIS
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('requests')
-                  .where('providerId', isEqualTo: null)
                   .snapshots(),
               builder: (context, snapshot) {
 
@@ -314,7 +318,11 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                   );
                 }
 
-                final docs = snapshot.data!.docs;
+                final docs = snapshot.data!.docs.where((doc) {
+                  final data =
+                      doc.data() as Map<String, dynamic>;
+                  return data['providerId'] == null;
+                }).toList();
 
                 if (docs.isEmpty) {
                   return const Center(
@@ -329,6 +337,9 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                     final doc = docs[index];
                     final data =
                         doc.data() as Map<String, dynamic>;
+
+                    final carregando =
+                        _processandoPedidos.contains(doc.id);
 
                     return Card(
                       margin: const EdgeInsets.all(10),
@@ -346,21 +357,22 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                               ),
                             ),
 
-                            const SizedBox(height: 5),
-
-                            Text(data['category'] ?? ''),
-
                             const SizedBox(height: 10),
 
-                            ElevatedButton(
-                              onPressed: () {
-                                desbloquearPedido(
-                                  doc.id,
-                                  data['chatId'],
-                                );
-                              },
-                              child: const Text(
-                                "Pegar pedido (R\$3)",
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: carregando
+                                    ? null
+                                    : () {
+                                        desbloquearPedido(
+                                          doc.id,
+                                          data['chatId'],
+                                        );
+                                      },
+                                child: carregando
+                                    ? const CircularProgressIndicator()
+                                    : const Text("Pegar pedido (R\$3)"),
                               ),
                             ),
                           ],

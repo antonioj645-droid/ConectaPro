@@ -16,9 +16,7 @@ class MeusPedidosPage extends StatefulWidget {
 
 class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
-  // ===========================
-  // 🔥 DESBLOQUEAR PEDIDO COMPLETO
-  // ===========================
+  // ✅ MANTIDO (não removi)
   Future<void> desbloquearPedidoCompleto(
     BuildContext context,
     String userId,
@@ -26,7 +24,6 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
     String? chatId,
   ) async {
 
-    // ✅ ABRE PIX
     final pagou = await showDialog(
       context: context,
       builder: (_) => const PixDialog(valor: 3),
@@ -57,15 +54,17 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
           ),
         );
 
-        // ✅ ABRE CHAT
-        if (chatId != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatPage(chatId: chatId),
-            ),
-          );
-        }
+        final chatFinal =
+            (chatId != null && chatId.toString().isNotEmpty)
+                ? chatId
+                : pedidoId;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatPage(chatId: chatFinal),
+          ),
+        );
 
       } else {
         throw Exception(data["error"]);
@@ -129,8 +128,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
               final chatId = data['chatId'];
               final price = data['price'];
               final providerId = data['providerId'];
-              final confirmado =
-                  data['confirmadoCliente'] ?? false;
+              final confirmado = data['confirmadoCliente'] ?? false;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -140,7 +138,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      /// ✅ DESCRIÇÃO
+                      // ✅ DESCRIÇÃO
                       Text(
                         descricao,
                         style: const TextStyle(
@@ -150,7 +148,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ STATUS PROFISSIONAL
+                      // ✅ STATUS
                       Text(
                         (providerId == null ||
                                 providerId.toString().isEmpty)
@@ -160,7 +158,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 5),
 
-                      /// 💰 VALOR
+                      // ✅ VALOR
                       if (price != null)
                         Text(
                           'Valor: R\$ $price',
@@ -172,7 +170,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ CONFIRMAR VALOR
+                      // ✅ CONFIRMAR VALOR
                       if (price != null && !confirmado)
                         ElevatedButton(
                           onPressed: () async {
@@ -187,8 +185,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                             ScaffoldMessenger.of(context)
                                 .showSnackBar(
                               const SnackBar(
-                                content:
-                                    Text("Valor confirmado ✅"),
+                                content: Text("Valor confirmado ✅"),
                               ),
                             );
                           },
@@ -206,25 +203,31 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// 🔒 LIBERA CHAT SÓ SE PAGAR
+                      // ✅ CHAT FUNCIONANDO (SEM PIX)
                       if (providerId != null)
                         ElevatedButton(
                           onPressed: () {
-                            desbloquearPedidoCompleto(
+
+                            final chatFinal =
+                                (chatId != null &&
+                                        chatId.toString().isNotEmpty)
+                                    ? chatId
+                                    : doc.id;
+
+                            Navigator.push(
                               context,
-                              user.uid,
-                              doc.id,
-                              chatId,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ChatPage(chatId: chatFinal),
+                              ),
                             );
                           },
-                          child: const Text(
-                            'Desbloquear e abrir chat 🔓💬',
-                          ),
+                          child: const Text('Abrir chat 💬'),
                         ),
 
                       const SizedBox(height: 10),
 
-                      /// ✅ STATUS FINAL
+                      // ✅ STATUS FINAL
                       if (providerId != null)
                         const Text(
                           '🛠 Serviço em andamento',
