@@ -16,7 +16,6 @@ class MeusPedidosPage extends StatefulWidget {
 
 class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
-  // ✅ MANTIDO (não removi)
   Future<void> desbloquearPedidoCompleto(
     BuildContext context,
     String userId,
@@ -129,6 +128,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
               final price = data['price'];
               final providerId = data['providerId'];
               final confirmado = data['confirmadoCliente'] ?? false;
+              final status = data['status'];
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -138,7 +138,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      // ✅ DESCRIÇÃO
+                      /// ✅ DESCRIÇÃO
                       Text(
                         descricao,
                         style: const TextStyle(
@@ -148,7 +148,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      // ✅ STATUS
+                      /// ✅ STATUS PROFISSIONAL
                       Text(
                         (providerId == null ||
                                 providerId.toString().isEmpty)
@@ -158,7 +158,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 5),
 
-                      // ✅ VALOR
+                      /// 💰 VALOR PROPOSTO
                       if (price != null)
                         Text(
                           'Valor: R\$ $price',
@@ -170,7 +170,7 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      // ✅ CONFIRMAR VALOR
+                      /// ✅ CONFIRMAR VALOR
                       if (price != null && !confirmado)
                         ElevatedButton(
                           onPressed: () async {
@@ -203,11 +203,10 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      // ✅ CHAT FUNCIONANDO (SEM PIX)
+                      /// ✅ CHAT
                       if (providerId != null)
                         ElevatedButton(
                           onPressed: () {
-
                             final chatFinal =
                                 (chatId != null &&
                                         chatId.toString().isNotEmpty)
@@ -227,14 +226,37 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      // ✅ STATUS FINAL
+                      /// ✅ STATUS DO SERVIÇO (CORRIGIDO)
                       if (providerId != null)
-                        const Text(
-                          '🛠 Serviço em andamento',
-                          style: TextStyle(
-                            color: Colors.orange,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+
+                            Text(
+                              status == 'finalizado'
+                                  ? '✅ Serviço finalizado'
+                                  : '🛠 Serviço em andamento',
+                              style: TextStyle(
+                                color: status == 'finalizado'
+                                    ? Colors.green
+                                    : Colors.orange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            /// ✅ VALOR FINAL
+                            if (status == 'finalizado' &&
+                                data['valorFinal'] != null)
+                              Text(
+                                'Valor pago: R\$ ${data['valorFinal']}',
+                                style: const TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                          ],
                         ),
                     ],
                   ),
