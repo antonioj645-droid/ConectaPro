@@ -23,9 +23,10 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
     String? chatId,
   ) async {
 
+    // ✅ CORRIGIDO PIX
     final pagou = await showDialog(
       context: context,
-      builder: (_) => const PixDialog(valor: 3),
+      builder: (_) => const PixDialog(),
     );
 
     if (pagou != true) return;
@@ -138,7 +139,6 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      /// ✅ DESCRIÇÃO
                       Text(
                         descricao,
                         style: const TextStyle(
@@ -148,7 +148,6 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ STATUS PROFISSIONAL
                       Text(
                         (providerId == null ||
                                 providerId.toString().isEmpty)
@@ -158,7 +157,6 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 5),
 
-                      /// 💰 VALOR PROPOSTO
                       if (price != null)
                         Text(
                           'Valor: R\$ $price',
@@ -170,7 +168,6 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ CONFIRMAR VALOR
                       if (price != null && !confirmado)
                         ElevatedButton(
                           onPressed: () async {
@@ -203,10 +200,10 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ CHAT
                       if (providerId != null)
                         ElevatedButton(
                           onPressed: () {
+
                             final chatFinal =
                                 (chatId != null &&
                                         chatId.toString().isNotEmpty)
@@ -226,7 +223,6 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ STATUS DO SERVIÇO (CORRIGIDO)
                       if (providerId != null)
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,7 +242,6 @@ class _MeusPedidosPageState extends State<MeusPedidosPage> {
 
                             const SizedBox(height: 5),
 
-                            /// ✅ VALOR FINAL
                             if (status == 'finalizado' &&
                                 data['valorFinal'] != null)
                               Text(
