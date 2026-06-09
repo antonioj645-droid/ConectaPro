@@ -16,6 +16,7 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController controller = TextEditingController();
   final ScrollController scrollController = ScrollController();
 
+  // ✅ ENVIAR MENSAGEM
   Future<void> enviarMensagem() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -30,17 +31,19 @@ class _ChatPageState extends State<ChatPage> {
         .add({
       'text': texto,
       'senderId': user.uid,
-      'createdAt': FieldValue.serverTimestamp(), // ✅ PADRÃO
-      'isRead': false, // ✅ NOVO (✔✔)
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
     });
 
+    // ✅ limpa campo + para typing
     controller.clear();
 
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    scrollController.jumpTo(
-      scrollController.position.maxScrollExtent,
-    );
+    await FirebaseFirestore.instance
+        .collection('chats')
+        .doc(widget.chatId)
+        .set({
+      'typing': null,
+    }, SetOptions(merge: true));
   }
 
   // ✅ MARCAR COMO LIDO (✔✔)
@@ -64,6 +67,21 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   @override
+  void dispose() {
+    controller.dispose();
+
+    // ✅ parar typing ao sair
+    FirebaseFirestore.instance
+        .collection('chats')
+        .doc(widget.chatId)
+        .set({
+      'typing': null,
+    }, SetOptions(merge: true));
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
 
     final user = FirebaseAuth.instance.currentUser;
@@ -76,13 +94,42 @@ class _ChatPageState extends State<ChatPage> {
       body: Column(
         children: [
 
+          // ✅ MOSTRAR "DIGITANDO..."
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('chats')
+                .doc(widget.chatId)
+                .snapshots(),
+            builder: (_, snapshot) {
+
+              final data =
+                  snapshot.data?.data() as Map<String, dynamic>?;
+
+              final typingUser = data?['typing'];
+
+              if (typingUser != null &&
+                  typingUser != user?.uid) {
+                return const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Text(
+                    "Digitando...",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                );
+              }
+
+              return const SizedBox();
+            },
+          ),
+
+          // ✅ CHAT
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('chats')
                   .doc(widget.chatId)
                   .collection('messages')
-                  .orderBy('createdAt', descending: false) // ✅ ORDEM CORRETA
+                  .orderBy('createdAt', descending: false)
                   .snapshots(),
 
               builder: (context, snapshot) {
@@ -94,13 +141,16 @@ class _ChatPageState extends State<ChatPage> {
 
                 final docs = snapshot.data!.docs;
 
-                // ✅ marca como lido sempre que atualizar
+                // ✅ marcar como lido
                 marcarComoLido();
 
+                // ✅ SCROLL AUTOMÁTICO
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (scrollController.hasClients) {
-                    scrollController.jumpTo(
+                    scrollController.animateTo(
                       scrollController.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
                     );
                   }
                 });
@@ -123,16 +173,14 @@ class _ChatPageState extends State<ChatPage> {
 
                       child: Container(
                         margin:
-                        const EdgeInsets.symmetric(vertical: 4),
-
+                            const EdgeInsets.symmetric(vertical: 4),
                         padding: const EdgeInsets.all(10),
-
                         decoration: BoxDecoration(
                           color: isMe
                               ? Colors.deepPurple
                               : Colors.grey[300],
                           borderRadius:
-                          BorderRadius.circular(12),
+                              BorderRadius.circular(12),
                         ),
 
                         child: Row(
@@ -150,7 +198,7 @@ class _ChatPageState extends State<ChatPage> {
 
                             const SizedBox(width: 5),
 
-                            // ✅ CHECK ✔✔ estilo WhatsApp
+                            // ✅ CHECK ✔✔
                             if (isMe)
                               Icon(
                                 data['isRead'] == true
@@ -171,6 +219,7 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
 
+          // ✅ INPUT
           Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
@@ -179,6 +228,19 @@ class _ChatPageState extends State<ChatPage> {
                 Expanded(
                   child: TextField(
                     controller: controller,
+
+                    // ✅ DETECTAR DIGITAÇÃO
+                    onChanged: (text) async {
+                      final user = FirebaseAuth.instance.currentUser;
+
+                      await FirebaseFirestore.instance
+                          .collection('chats')
+                          .doc(widget.chatId)
+                          .set({
+                        'typing': text.isNotEmpty ? user?.uid : null,
+                      }, SetOptions(merge: true));
+                    },
+
                     decoration: const InputDecoration(
                       hintText: 'Digite uma mensagem...',
                     ),
