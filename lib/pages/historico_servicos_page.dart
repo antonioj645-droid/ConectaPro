@@ -7,7 +7,6 @@ class HistoricoServicosPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
@@ -31,28 +30,29 @@ class HistoricoServicosPage extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
 
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(),
             );
           }
 
-          final docs = snapshot.data!.docs;
-
-          if (docs.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
               child: Text("Nenhum serviço finalizado"),
             );
           }
 
+          final docs = snapshot.data!.docs;
+
           double total = 0;
 
-          for (var doc in docs) {
+          for (final doc in docs) {
             final data = doc.data();
-            final valorFinal = data['valorFinal'];
 
-            if (valorFinal is num) {
-              total += valorFinal.toDouble();
+            final valor = data['valorFinal'];
+
+            if (valor is num) {
+              total += valor.toDouble();
             }
           }
 
@@ -61,37 +61,45 @@ class HistoricoServicosPage extends StatelessWidget {
 
               // ✅ TOTAL GANHO
               Container(
-                padding: const EdgeInsets.all(12),
                 width: double.infinity,
+                padding: const EdgeInsets.all(14),
                 color: Colors.green,
                 child: Text(
                   "Total ganho: R\$ ${total.toStringAsFixed(2)}",
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
               ),
 
-              // ✅ LISTA DE SERVIÇOS
+              // ✅ LISTA
               Expanded(
                 child: ListView.builder(
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
 
-                    final doc = docs[index];
-                    final data = doc.data();
+                    final data = docs[index].data();
 
-                    final descricao = data['description'] ?? '';
-                    final valorFinal = data['valorFinal'] ?? 0;
+                    final descricao =
+                        data['description']?.toString() ?? '';
+
+                    final valorFinal =
+                        (data['valorFinal'] is num)
+                            ? (data['valorFinal'] as num).toDouble()
+                            : 0.0;
 
                     return Card(
-                      margin: const EdgeInsets.all(10),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       child: ListTile(
                         title: Text(descricao),
 
                         subtitle: Text(
-                          "R\$ ${valorFinal.toString()}",
+                          "R\$ ${valorFinal.toStringAsFixed(2)}",
                           style: const TextStyle(
                             color: Colors.green,
                             fontWeight: FontWeight.bold,
