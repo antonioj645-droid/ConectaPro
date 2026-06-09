@@ -165,7 +165,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
         actions: [
 
-          // 🕒 HISTÓRICO
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: "Histórico",
@@ -179,7 +178,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
-          // 🧳 MEUS SERVIÇOS
           IconButton(
             icon: const Icon(Icons.work),
             onPressed: () {
@@ -192,7 +190,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
-          // 🔄 ATUALIZAR
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -200,19 +197,18 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
-          // 💰 PIX (CORRIGIDO ✅)
+          // ✅ ✅ PIX CORRIGIDO (ÚNICA ALTERAÇÃO)
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
             tooltip: "Adicionar saldo",
             onPressed: () {
               showDialog(
                 context: context,
-                builder: (_) => const PixDialog(),
+                builder: (_) => PixDialog(valor: 10),
               );
             },
           ),
 
-          // 🚪 LOGOUT
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
