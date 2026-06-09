@@ -29,7 +29,6 @@ class HistoricoServicosPage extends StatelessWidget {
             .where('providerId', isEqualTo: user.uid)
             .where('status', isEqualTo: 'finalizado')
             .snapshots(),
-
         builder: (context, snapshot) {
 
           if (!snapshot.hasData) {
@@ -50,7 +49,6 @@ class HistoricoServicosPage extends StatelessWidget {
 
           for (var doc in docs) {
             final data = doc.data();
-
             final valorFinal = data['valorFinal'];
 
             if (valorFinal is num) {
@@ -75,7 +73,7 @@ class HistoricoServicosPage extends StatelessWidget {
                 ),
               ),
 
-              // ✅ LISTA
+              // ✅ LISTA DE SERVIÇOS
               Expanded(
                 child: ListView.builder(
                   itemCount: docs.length,
