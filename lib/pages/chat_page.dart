@@ -14,6 +14,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
 
   final TextEditingController controller = TextEditingController();
+  final ScrollController scrollController = ScrollController();
 
   Future<void> enviarMensagem() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -29,14 +30,42 @@ class _ChatPageState extends State<ChatPage> {
         .add({
       'text': texto,
       'senderId': user.uid,
-      'timestamp': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(), // ✅ PADRÃO
+      'isRead': false, // ✅ NOVO (✔✔)
     });
 
     controller.clear();
+
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    scrollController.jumpTo(
+      scrollController.position.maxScrollExtent,
+    );
+  }
+
+  // ✅ MARCAR COMO LIDO (✔✔)
+  Future<void> marcarComoLido() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('chats')
+        .doc(widget.chatId)
+        .collection('messages')
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      if (data['senderId'] != user.uid) {
+        doc.reference.update({'isRead': true});
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
@@ -53,7 +82,7 @@ class _ChatPageState extends State<ChatPage> {
                   .collection('chats')
                   .doc(widget.chatId)
                   .collection('messages')
-                  .orderBy('timestamp')
+                  .orderBy('createdAt', descending: false) // ✅ ORDEM CORRETA
                   .snapshots(),
 
               builder: (context, snapshot) {
@@ -65,12 +94,25 @@ class _ChatPageState extends State<ChatPage> {
 
                 final docs = snapshot.data!.docs;
 
+                // ✅ marca como lido sempre que atualizar
+                marcarComoLido();
+
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (scrollController.hasClients) {
+                    scrollController.jumpTo(
+                      scrollController.position.maxScrollExtent,
+                    );
+                  }
+                });
+
                 return ListView.builder(
+                  controller: scrollController,
                   padding: const EdgeInsets.all(10),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
 
-                    final data = docs[index].data() as Map<String, dynamic>;
+                    final data =
+                        docs[index].data() as Map<String, dynamic>;
 
                     final isMe = data['senderId'] == user?.uid;
 
@@ -93,13 +135,33 @@ class _ChatPageState extends State<ChatPage> {
                           BorderRadius.circular(12),
                         ),
 
-                        child: Text(
-                          data['text'] ?? '',
-                          style: TextStyle(
-                            color: isMe
-                                ? Colors.white
-                                : Colors.black,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+
+                            Text(
+                              data['text'] ?? '',
+                              style: TextStyle(
+                                color: isMe
+                                    ? Colors.white
+                                    : Colors.black,
+                              ),
+                            ),
+
+                            const SizedBox(width: 5),
+
+                            // ✅ CHECK ✔✔ estilo WhatsApp
+                            if (isMe)
+                              Icon(
+                                data['isRead'] == true
+                                    ? Icons.done_all
+                                    : Icons.done,
+                                size: 16,
+                                color: data['isRead'] == true
+                                    ? Colors.blue
+                                    : Colors.white,
+                              ),
+                          ],
                         ),
                       ),
                     );
