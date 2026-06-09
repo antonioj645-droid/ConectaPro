@@ -26,7 +26,6 @@ class MeusServicosPage extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('requests')
             .where('providerId', isEqualTo: user.uid)
-            .where('status', isNotEqualTo: 'finalizado') // ✅ CORREÇÃO AQUI
             .snapshots(),
         builder: (context, snapshot) {
 
@@ -34,19 +33,23 @@ class MeusServicosPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final docs = snapshot.data!.docs;
+          // ✅ FILTRO CORRETO AQUI (SEM BUG)
+          final docsFiltrados = snapshot.data!.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['status'] != 'finalizado';
+          }).toList();
 
-          if (docs.isEmpty) {
+          if (docsFiltrados.isEmpty) {
             return const Center(
               child: Text("Nenhum serviço em andamento"),
             );
           }
 
           return ListView.builder(
-            itemCount: docs.length,
+            itemCount: docsFiltrados.length,
             itemBuilder: (context, index) {
 
-              final doc = docs[index];
+              final doc = docsFiltrados[index];
               final data = doc.data() as Map<String, dynamic>;
 
               final descricao = data['description'] ?? '';
@@ -59,7 +62,7 @@ class MeusServicosPage extends StatelessWidget {
                   child: Column(
                     children: [
 
-                      /// ✅ DESCRIÇÃO
+                      // ✅ DESCRIÇÃO
                       Text(
                         descricao,
                         style: const TextStyle(
@@ -69,13 +72,14 @@ class MeusServicosPage extends StatelessWidget {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ ABRIR CHAT
+                      // ✅ CHAT
                       ElevatedButton(
                         onPressed: () {
-
                           if (chatId == null) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Chat não disponível")),
+                              const SnackBar(
+                                content: Text("Chat não disponível"),
+                              ),
                             );
                             return;
                           }
@@ -92,7 +96,7 @@ class MeusServicosPage extends StatelessWidget {
 
                       const SizedBox(height: 10),
 
-                      /// ✅ FINALIZAR SERVIÇO
+                      // ✅ FINALIZAR
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
@@ -146,10 +150,12 @@ class MeusServicosPage extends StatelessWidget {
                                       return;
                                     }
 
+                                    // ✅ DESCONTA
                                     await userRef.update({
                                       "balance": saldo - comissao
                                     });
 
+                                    // ✅ FINALIZA
                                     await FirebaseFirestore.instance
                                         .collection("requests")
                                         .doc(doc.id)
@@ -164,7 +170,8 @@ class MeusServicosPage extends StatelessWidget {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                            "Serviço finalizado ✅ Comissão: R\$${comissao.toStringAsFixed(2)}"),
+                                          "Finalizado ✅ Comissão: R\$${comissao.toStringAsFixed(2)}",
+                                        ),
                                       ),
                                     );
                                   },
