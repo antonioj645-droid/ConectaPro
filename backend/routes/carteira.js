@@ -24,33 +24,53 @@ router.post("/desbloquear", async (req, res) => {
     await db.runTransaction(async (t) => {
 
       const userDoc = await t.get(userRef);
-      const pedidoDoc = await t.get(pedidoRef); // ✅ FALTAVA ISSO
+      const pedidoDoc = await t.get(pedidoRef);
 
-      // ✅ valida usuário
       if (!userDoc.exists) {
         throw new Error("Usuário não encontrado");
       }
 
-      // ✅ valida pedido (ESSENCIAL)
       if (!pedidoDoc.exists) {
         throw new Error("Pedido não encontrado");
       }
 
       const user = userDoc.data();
+      const pedido = pedidoDoc.data();
+
+      // ✅ AGORA USA "role"
+      if (user.role !== "profissional") {
+        throw new Error("Somente profissional pode pegar pedido");
+      }
+
+      // ✅ evita duplicar
+      if (pedido.providerId) {
+        throw new Error("Pedido já foi aceito");
+      }
+
       const saldo = user.balance || 0;
 
       if (saldo < 3) {
         throw new Error("Saldo insuficiente");
       }
 
-      // ✅ desconta saldo
+      // ✅ desconta R$3
       t.update(userRef, {
         balance: saldo - 3
       });
 
-      // ✅ libera pedido
+      // ✅ garante chatId
+      let chatId = pedido.chatId;
+
+      if (!chatId) {
+        chatId = db.collection("chats").doc().id;
+      }
+
+      // ✅ atualiza pedido
       t.update(pedidoRef, {
-        providerId: userId
+        providerId: userId,
+        status: "aceito",
+        chatId: chatId,
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
     });
@@ -61,7 +81,7 @@ router.post("/desbloquear", async (req, res) => {
 
   } catch (error) {
 
-    console.log("🔥 ERRO BACKEND REAL:", error);
+    console.log("🔥 ERRO:", error);
 
     return res.status(400).json({
       success: false,

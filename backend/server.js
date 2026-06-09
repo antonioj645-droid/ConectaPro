@@ -6,16 +6,18 @@ const admin = require('firebase-admin');
 
 const app = express();
 
-// ✅ 🔥 ESSA LINHA É OBRIGATÓRIA NO RENDER
 app.set('trust proxy', 1);
 
-// ✅ MIDDLEWARES
-app.use(cors());
+// ✅ CORS
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
-// =========================
 // ✅ FIREBASE
-// =========================
 try {
 
   if (!process.env.FIREBASE_KEY) {
@@ -24,7 +26,6 @@ try {
 
   const serviceAccount = JSON.parse(process.env.FIREBASE_KEY);
 
-  // ✅ evita erro de múltiplas inicializações
   if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
@@ -38,28 +39,25 @@ try {
   process.exit(1);
 }
 
-// =========================
-// ✅ ROTAS
-// =========================
-const pixRoutes = require('./routes/pix');
+// ✅ LOG
+app.use((req, res, next) => {
+  console.log(`📡 ${req.method} ${req.url}`);
+  next();
+});
 
-// ✅ SUA ROTA PIX (MANTIDA)
+// ✅ ROTAS
+const pixRoutes = require('./routes/pix');
 app.use('/pix', pixRoutes);
 
-// ✅ ✅ ADICIONADO (NÃO EXISTIA)
 const carteiraRoutes = require('./routes/carteira');
 app.use('/carteira', carteiraRoutes);
 
-// =========================
-// ✅ ROTA TESTE
-// =========================
+// ✅ TESTE
 app.get('/', (req, res) => {
   res.send('✅ Backend ConectaPro rodando');
 });
 
-// =========================
 // ✅ PORTA
-// =========================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
