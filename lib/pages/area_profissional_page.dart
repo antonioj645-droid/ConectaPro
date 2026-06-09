@@ -200,14 +200,14 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
-          // 💰 PIX
+          // 💰 PIX (CORRIGIDO ✅)
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
             tooltip: "Adicionar saldo",
             onPressed: () {
               showDialog(
                 context: context,
-                builder: (_) => const PixDialog(valor: 3),
+                builder: (_) => const PixDialog(),
               );
             },
           ),
