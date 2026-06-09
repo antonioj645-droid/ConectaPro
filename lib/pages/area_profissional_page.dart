@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'chat_page.dart';
 import 'pix_dialog.dart';
 import 'meus_servicos_page.dart';
+import 'historico_servicos_page.dart';
 
 class AreaProfissionalPage extends StatefulWidget {
   const AreaProfissionalPage({Key? key}) : super(key: key);
@@ -164,6 +165,21 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
         actions: [
 
+          // 🕒 HISTÓRICO
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: "Histórico",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistoricoServicosPage(),
+                ),
+              );
+            },
+          ),
+
+          // 🧳 MEUS SERVIÇOS
           IconButton(
             icon: const Icon(Icons.work),
             onPressed: () {
@@ -176,6 +192,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
+          // 🔄 ATUALIZAR
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -183,6 +200,19 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             },
           ),
 
+          // 💰 PIX
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet),
+            tooltip: "Adicionar saldo",
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => const PixDialog(valor: 3),
+              );
+            },
+          ),
+
+          // 🚪 LOGOUT
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -236,7 +266,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
                 final docsTodos = snapshot.data!.docs;
 
-                // ✅ TRAVA PRINCIPAL
                 final temServicoAtivo = docsTodos.any((d) {
                   final data = d.data() as Map<String, dynamic>;
                   return data['providerId'] == user.uid &&
