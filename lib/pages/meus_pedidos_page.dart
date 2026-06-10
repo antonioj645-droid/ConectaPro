@@ -1,373 +1,201 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'chat_page.dart';
-import 'pix_dialog.dart';
-import 'meus_servicos_page.dart';
-import 'historico_servicos_page.dart';
 
-class AreaProfissionalPage extends StatefulWidget {
-  const AreaProfissionalPage({Key? key}) : super(key: key);
+class MeusPedidosPage extends StatelessWidget {
+  const MeusPedidosPage({super.key});
 
-  @override
-  State<AreaProfissionalPage> createState() =>
-      _AreaProfissionalPageState();
-}
+  static const _black          = Color(0xFF000000);
+  static const _white          = Color(0xFFFFFFFF);
+  static const _accent         = Color(0xFF276EF1);
+  static const _surface        = Color(0xFFF6F6F6);
+  static const _textSecondary  = Color(0xFF757575);
 
-class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
-
-  final Set<String> _processandoPedidos = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _salvarLocalizacao();
-  }
-
-  Future<void> _salvarLocalizacao() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      final permission = await Geolocator.requestPermission();
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return;
-      }
-
-      final pos = await Geolocator.getCurrentPosition();
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-        'latitude': pos.latitude,
-        'longitude': pos.longitude,
-      });
-    } catch (_) {}
-  }
-
-  Future<void> desbloquearPedido(
-    String pedidoId,
-    String? chatId,
-  ) async {
-
-    if (_processandoPedidos.contains(pedidoId)) return;
-
-    setState(() {
-      _processandoPedidos.add(pedidoId);
-    });
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() => _processandoPedidos.remove(pedidoId));
-      return;
+  Color _corStatus(String status) {
+    switch (status) {
+      case 'aceito':     return const Color(0xFF34C759);
+      case 'concluido':  return _accent;
+      case 'cancelado':  return Colors.red;
+      default:           return const Color(0xFFFF9500);
     }
+  }
 
-    try {
-
-      final docUser = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      final saldo =
-          ((docUser.data()?['balance'] ?? 0) as num).toDouble();
-
-      if (saldo >= 3) {
-
-        final uri = Uri.https(
-          'conectapro-backend-1.onrender.com',
-          '/carteira/desbloquear',
-        );
-
-        final response = await http.post(
-          uri,
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: jsonEncode({
-            "userId": user.uid,
-            "pedidoId": pedidoId,
-          }),
-        );
-
-        if (response.statusCode != 200) {
-          throw Exception(response.body);
-        }
-
-        final data = jsonDecode(response.body);
-
-        if (data["success"] == true) {
-
-          await FirebaseFirestore.instance
-              .collection('requests')
-              .doc(pedidoId)
-              .update({
-            'providerId': user.uid,
-            'status': 'aceito',
-            'acceptedAt': FieldValue.serverTimestamp(),
-          });
-
-          setState(() {});
-
-          final chatFinal =
-              (chatId != null && chatId.toString().isNotEmpty)
-                  ? chatId
-                  : pedidoId;
-
-          if (!mounted) return;
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatPage(chatId: chatFinal),
-            ),
-          );
-        }
-
-        return;
-      }
-
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro: $e")),
-        );
-      }
-    } finally {
-      setState(() {
-        _processandoPedidos.remove(pedidoId);
-      });
+  String _labelStatus(String status) {
+    switch (status) {
+      case 'pendente':   return 'Aguardando';
+      case 'aceito':     return 'Em andamento';
+      case 'concluido':  return 'Concluído';
+      case 'cancelado':  return 'Cancelado';
+      default:           return status;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-
     final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Não logado')),
-      );
-    }
-
     return Scaffold(
+      backgroundColor: _surface,
       appBar: AppBar(
-        title: const Text('Painel Profissional'),
-
-        actions: [
-
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: "Histórico",
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const HistoricoServicosPage(),
-                ),
-              );
-            },
-          ),
-
-          IconButton(
-            icon: const Icon(Icons.work),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MeusServicosPage(),
-                ),
-              );
-            },
-          ),
-
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {});
-            },
-          ),
-
-          // ✅ PIX COM VALOR ESCOLHIDO
-          IconButton(
-            icon: const Icon(Icons.account_balance_wallet),
-            tooltip: "Adicionar saldo",
-            onPressed: () async {
-
-              final controller = TextEditingController();
-
-              final valor = await showDialog<double>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text("Digite o valor"),
-                  content: TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      hintText: "Ex: 10, 50, 100",
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Cancelar"),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        final v = double.tryParse(controller.text);
-
-                        if (v == null || v < 10) return;
-
-                        Navigator.pop(context, v);
-                      },
-                      child: const Text("Continuar"),
-                    ),
-                  ],
-                ),
-              );
-
-              if (valor == null) return;
-
-              // ✅ CHAMA PIX REAL
-              showDialog(
-                context: context,
-                builder: (_) => PixDialog(valor: valor),
-              );
-            },
-          ),
-
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (!mounted) return;
-              Navigator.pop(context);
-            },
-          ),
-        ],
+        backgroundColor: _black,
+        foregroundColor: _white,
+        elevation: 0,
+        title: const Text(
+          'Meus Pedidos',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
       ),
-
-      body: Column(
-        children: [
-
-          StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .snapshots(),
-            builder: (context, snapshot) {
-
-              double saldo = 0;
-
-              if (snapshot.hasData && snapshot.data!.exists) {
-                final data =
-                    snapshot.data!.data() as Map<String, dynamic>;
-                saldo = ((data['balance'] ?? 0) as num).toDouble();
-              }
-
-              return Container(
-                padding: const EdgeInsets.all(12),
-                width: double.infinity,
-                color: Colors.black12,
-                child: Text(
-                  'Saldo: R\$${saldo.toStringAsFixed(2)}',
-                ),
-              );
-            },
-          ),
-
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
+      body: user == null
+          ? const Center(child: Text('Não logado'))
+          : StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('requests')
+                  .where('clientId', isEqualTo: user.uid)
+                  .orderBy('createdAt', descending: true)
                   .snapshots(),
-              builder: (context, snapshot) {
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: CircularProgressIndicator(color: _accent));
                 }
 
-                final docsTodos = snapshot.data!.docs;
+                if (snap.hasError) {
+                  return Center(child: Text('Erro: ${snap.error}'));
+                }
 
-                final temServicoAtivo = docsTodos.any((d) {
-                  final data = d.data() as Map<String, dynamic>;
-                  return data['providerId'] == user.uid &&
-                         data['status'] == 'aceito';
-                });
+                final docs = snap.data?.docs ?? [];
 
-                final docs = docsTodos.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return data['providerId'] == null;
-                }).toList();
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.inbox_outlined, size: 56, color: _textSecondary),
+                        SizedBox(height: 12),
+                        Text('Nenhum pedido ainda',
+                            style: TextStyle(fontSize: 16, color: _textSecondary, fontWeight: FontWeight.w500)),
+                        SizedBox(height: 4),
+                        Text('Seus pedidos aparecerão aqui.',
+                            style: TextStyle(fontSize: 13, color: _textSecondary)),
+                      ],
+                    ),
+                  );
+                }
 
-                return ListView.builder(
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
                   itemCount: docs.length,
-                  itemBuilder: (context, index) {
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, i) {
+                    final data = docs[i].data() as Map<String, dynamic>;
+                    final pedidoId = docs[i].id;
+                    final titulo = data['titulo'] ?? data['title'] ?? 'Sem título';
+                    final descricao = data['descricao'] ?? data['description'] ?? '';
+                    final status = data['status'] ?? 'pendente';
+                    final chatId = data['chatId'] ?? pedidoId;
 
-                    final doc = docs[index];
-                    final data = doc.data() as Map<String, dynamic>;
-
-                    final carregando =
-                        _processandoPedidos.contains(doc.id);
-
-                    return Card(
-                      margin: const EdgeInsets.all(10),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-
-                            Text(
-                              data['description'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: _white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color.fromRGBO(0, 0, 0, 0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    titulo,
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: _black),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Color.fromRGBO(
+                                      _corStatus(status).red,
+                                      _corStatus(status).green,
+                                      _corStatus(status).blue,
+                                      0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    _labelStatus(status),
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: _corStatus(status)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (descricao.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: Text(
+                                descricao,
+                                style: const TextStyle(
+                                    fontSize: 13, color: _textSecondary, height: 1.4),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-
-                            const SizedBox(height: 10),
-
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: (carregando || temServicoAtivo)
-                                    ? null
-                                    : () {
-                                        desbloquearPedido(
-                                          doc.id,
-                                          data['chatId'],
-                                        );
-                                      },
-                                child: carregando
-                                    ? const CircularProgressIndicator()
-                                    : Text(
-                                        temServicoAtivo
-                                            ? "Finalize seu serviço primeiro"
-                                            : "Pegar pedido (R\$3)",
-                                      ),
+                          if (status == 'aceito')
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 44,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _black,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12)),
+                                    elevation: 0,
+                                  ),
+                                  icon: const Icon(Icons.chat_outlined,
+                                      size: 16, color: _white),
+                                  label: const Text('Abrir chat',
+                                      style: TextStyle(
+                                          color: _white, fontWeight: FontWeight.w700)),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => ChatPage(chatId: chatId)),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            )
+                          else
+                            const SizedBox(height: 16),
+                        ],
                       ),
                     );
                   },
                 );
               },
             ),
-          ),
-        ],
-      ),
     );
   }
 }
