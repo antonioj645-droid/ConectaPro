@@ -35,7 +35,7 @@ class _PixDialogState extends State<PixDialog> {
   double?                  _valorEscolhido;
   final TextEditingController _controller = TextEditingController();
 
-  final String _baseUrl = "https://conectapro-backend-y7oe.onrender.com";
+  final String _baseUrl = "https://conectapro-backend-y7oe.onrender.com/pix";
 
   @override
   void initState() {

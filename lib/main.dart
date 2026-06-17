@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'firebase_options.dart';
-
-// ✅ NOVO IMPORT (NOTIFICAÇÃO LOCAL)
 import 'services/notification_service.dart';
 
-// PÁGINAS
 import 'pages/login_page.dart';
 import 'pages/area_cliente_page.dart';
 import 'pages/area_profissional_page.dart';
 import 'pages/admin_page.dart';
 
-// SPLASH
 import 'screens/splash/splash_screen.dart';
 
 Future<void> main() async {
@@ -26,10 +23,8 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ✅ INICIALIZA NOTIFICAÇÃO LOCAL
   await NotificationService.init();
 
-  // ✅ FCM só no mobile
   if (!kIsWeb) {
     await setupNotifications();
   }
@@ -37,29 +32,33 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-// ✅ PUSH (FCM)
 Future<void> setupNotifications() async {
   try {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    final messaging = FirebaseMessaging.instance;
 
-    await messaging.requestPermission();
+    await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
-    String? token = await messaging.getToken();
-    debugPrint("TOKEN DISPOSITIVO: $token");
+    final token = await messaging.getToken();
+    debugPrint('TOKEN FCM: $token');
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint("Nova notificação FCM: ${message.notification?.title}");
+      debugPrint('Nova notificação: ${message.notification?.title}');
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint("Notificação aberta");
-    });
+    FirebaseMessaging.onMessageOpenedApp.listen(
+      (RemoteMessage message) {
+        debugPrint('Usuário abriu a notificação');
+      },
+    );
   } catch (e) {
-    debugPrint("Erro FCM: $e");
+    debugPrint('Erro FCM: $e');
   }
 }
 
-// ✅ APP ROOT
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -72,12 +71,13 @@ class MyApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF185FA5),
         useMaterial3: true,
       ),
+
+      // ✅ CORRIGIDO (sem const)
       home: SplashScreen(),
     );
   }
 }
 
-// ✅ AUTH CHECK
 class AuthCheck extends StatelessWidget {
   const AuthCheck({super.key});
 
@@ -86,7 +86,6 @@ class AuthCheck extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, authSnap) {
-
         if (authSnap.connectionState == ConnectionState.waiting) {
           return const _LoadingPage();
         }
@@ -103,7 +102,6 @@ class AuthCheck extends StatelessWidget {
               .doc(user.uid)
               .get(),
           builder: (context, snap) {
-
             if (snap.connectionState == ConnectionState.waiting) {
               return const _LoadingPage();
             }
@@ -111,21 +109,18 @@ class AuthCheck extends StatelessWidget {
             if (snap.hasError) {
               return _ErrorPage(
                 message: snap.error.toString(),
-                onRetry: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AuthCheck(),
-                    ),
-                  );
-                },
+                onRetry: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => const AuthCheck(),
+                  ),
+                ),
               );
             }
 
             final doc = snap.data;
 
             if (doc == null || !doc.exists) {
-              _createUser(user);
+              Future.microtask(() => _createUser(user));
               return const AreaClientePage();
             }
 
@@ -135,8 +130,8 @@ class AuthCheck extends StatelessWidget {
               return const LoginPage();
             }
 
-            final bool blocked = (data['blocked'] as bool?) ?? false;
-            final String role = (data['role'] as String?) ?? 'cliente';
+            final blocked = (data['blocked'] ?? false) as bool;
+            final role = (data['role'] ?? 'cliente').toString();
 
             if (blocked) {
               return Scaffold(
@@ -158,7 +153,7 @@ class AuthCheck extends StatelessWidget {
                         onPressed: () async {
                           await FirebaseAuth.instance.signOut();
                         },
-                        child: const Text("Sair"),
+                        child: const Text('Sair'),
                       ),
                     ],
                   ),
@@ -168,10 +163,11 @@ class AuthCheck extends StatelessWidget {
 
             switch (role) {
               case 'admin':
-                return AdminPage();
+                return const AdminPage();
 
               case 'profissional':
-                return const AreaProfissionalPage();
+                // ✅ CORRIGIDO (sem const)
+                return AreaProfissionalPage();
 
               default:
                 return const AreaClientePage();
@@ -182,8 +178,7 @@ class AuthCheck extends StatelessWidget {
     );
   }
 
-  // ✅ CRIAR USUÁRIO + TOKEN
-  Future<void> _createUser(User user) async {
+  static Future<void> _createUser(User user) async {
     try {
       await FirebaseFirestore.instance
           .collection('users')
@@ -197,25 +192,21 @@ class AuthCheck extends StatelessWidget {
       }, SetOptions(merge: true));
 
       if (!kIsWeb) {
-        String? token =
-            await FirebaseMessaging.instance.getToken();
+        final token = await FirebaseMessaging.instance.getToken();
 
         if (token != null) {
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
-              .update({
-            'fcmToken': token,
-          });
+              .update({'fcmToken': token});
         }
       }
     } catch (e) {
-      debugPrint("Erro criando usuário: $e");
+      debugPrint('Erro ao criar usuário: $e');
     }
   }
 }
 
-// ✅ LOADING
 class _LoadingPage extends StatelessWidget {
   const _LoadingPage();
 
@@ -227,7 +218,6 @@ class _LoadingPage extends StatelessWidget {
   }
 }
 
-// ✅ ERROR
 class _ErrorPage extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
@@ -242,17 +232,18 @@ class _ErrorPage extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 60),
+              const Icon(Icons.error_outline,
+                  color: Colors.red, size: 60),
               const SizedBox(height: 15),
               Text(message, textAlign: TextAlign.center),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: onRetry,
-                child: const Text("Tentar novamente"),
+                child: const Text('Tentar novamente'),
               ),
             ],
           ),

@@ -4,11 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'chat_page.dart';
 import 'pix_dialog.dart';
 import 'meus_servicos_page.dart';
 import 'historico_servicos_page.dart';
+import 'meu_perfil_profissional_page.dart';
 import 'meu_perfil_profissional_page.dart';
 
 class AreaProfissionalPage extends StatefulWidget {
@@ -25,43 +25,11 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
   static const _textSecondary = Color(0xFF757575);
 
   final Set<String> _processandoPedidos = {};
-  final Set<String> _pedidosConhecidos   = {};
-  bool _inicializado = false;
-
-  final FlutterLocalNotificationsPlugin _localNotif =
-      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
     super.initState();
-    _initNotificacoes();
     _atualizarLocalizacao();
-  }
-
-  Future<void> _initNotificacoes() async {
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: android);
-    await _localNotif.initialize(settings);
-  }
-
-  Future<void> _mostrarNotificacao(String titulo, String corpo) async {
-    const android = AndroidNotificationDetails(
-      'pedidos_channel',
-      'Novos Pedidos',
-      channelDescription: 'Notificações de novos pedidos disponíveis',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-      icon: '@mipmap/ic_launcher',
-    );
-    const details = NotificationDetails(android: android);
-    await _localNotif.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      titulo,
-      corpo,
-      details,
-    );
   }
 
   Future<void> _atualizarLocalizacao() async {
@@ -150,10 +118,9 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             .doc(pedidoId)
             .get();
 
-        final chatFinal =
-            (pedidoAtualizado.data()?['chatId'] as String?)?.isNotEmpty == true
-                ? pedidoAtualizado.data()!['chatId'] as String
-                : (chatId != null && chatId.isNotEmpty ? chatId : pedidoId);
+        final chatFinal = (pedidoAtualizado.data()?['chatId'] as String?)?.isNotEmpty == true
+            ? pedidoAtualizado.data()!['chatId'] as String
+            : (chatId != null && chatId.isNotEmpty ? chatId : pedidoId);
 
         if (!mounted) return;
         Navigator.push(
@@ -237,8 +204,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
               if (novos > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFF3B30),
                     borderRadius: BorderRadius.circular(20),
@@ -258,6 +224,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         },
       ),
       actions: [
+        // ? BOTÃO PERFIL ADICIONADO
         IconButton(
           icon: const Icon(Icons.person_outline),
           tooltip: 'Meu perfil',
@@ -343,8 +310,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                   if (mediaAvaliacao > 0)
                     Row(
                       children: [
-                        const Icon(Icons.star,
-                            size: 13, color: Color(0xFFFFCC00)),
+                        const Icon(Icons.star, size: 13, color: Color(0xFFFFCC00)),
                         const SizedBox(width: 3),
                         Text(
                           '${mediaAvaliacao.toStringAsFixed(1)} '
@@ -425,37 +391,9 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
               return pid == null || pid.toString().isEmpty;
             }).toList();
 
-            // ? Detecta pedidos novos e dispara notificação local
-            if (_inicializado) {
-              for (final doc in pedidos) {
-                if (!_pedidosConhecidos.contains(doc.id)) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final titulo = data['titulo'] ?? data['title'] ?? 'Novo serviço';
-                  final categoria = data['categoria'] ?? '';
-                  final corpo = categoria.isNotEmpty
-                      ? '$categoria — $titulo'
-                      : titulo;
-                  _mostrarNotificacao('?? Novo pedido disponível!', corpo);
-                }
-              }
-            }
-
-            // Atualiza set de pedidos conhecidos
-            _pedidosConhecidos.clear();
-            for (final doc in pedidos) {
-              _pedidosConhecidos.add(doc.id);
-            }
-            if (!_inicializado) {
-              Future.microtask(() {
-                if (mounted) setState(() => _inicializado = true);
-              });
-            }
-
             pedidos.sort((a, b) {
-              final dataA = (a.data() as Map)['criadoEm'] ??
-                  (a.data() as Map)['createdAt'];
-              final dataB = (b.data() as Map)['criadoEm'] ??
-                  (b.data() as Map)['createdAt'];
+              final dataA = (a.data() as Map)['criadoEm'] ?? (a.data() as Map)['createdAt'];
+              final dataB = (b.data() as Map)['criadoEm'] ?? (b.data() as Map)['createdAt'];
               if (dataA == null || dataB == null) return 0;
               return dataB.compareTo(dataA);
             });
@@ -465,8 +403,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.inbox_outlined,
-                        size: 56, color: _textSecondary),
+                    Icon(Icons.inbox_outlined, size: 56, color: _textSecondary),
                     SizedBox(height: 12),
                     Text('Nenhum pedido disponível',
                         style: TextStyle(
@@ -475,8 +412,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                             fontWeight: FontWeight.w500)),
                     SizedBox(height: 4),
                     Text('Novos pedidos aparecerão aqui automaticamente.',
-                        style:
-                            TextStyle(fontSize: 13, color: _textSecondary)),
+                        style: TextStyle(fontSize: 13, color: _textSecondary)),
                   ],
                 ),
               );
@@ -578,8 +514,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             ),
           ),
 
-          const Divider(
-              color: Color(0xFFE5E5E5), height: 1, indent: 16, endIndent: 16),
+          const Divider(color: Color(0xFFE5E5E5), height: 1, indent: 16, endIndent: 16),
 
           if (descricao.isNotEmpty)
             Padding(
