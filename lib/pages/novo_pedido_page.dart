@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class NovoPedidoPage extends StatefulWidget {
   const NovoPedidoPage({super.key});
@@ -38,17 +40,33 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Usuário não autenticado');
 
-      await FirebaseFirestore.instance.collection('requests').add({
-        'clienteId':  user.uid,
-        'titulo':     _tituloCtrl.text.trim(),
-        'categoria':  _categoriaSelecionada,
-        'status':     'aberto',
-        'criadoEm':   FieldValue.serverTimestamp(),
-        'providerId': null,
-        'chatId':     null,
-        'valorServico': null,  // profissional define depois
+      // Salva pedido no Firestore
+      final docRef = await FirebaseFirestore.instance.collection('requests').add({
+        'clienteId':    user.uid,
+        'titulo':       _tituloCtrl.text.trim(),
+        'categoria':    _categoriaSelecionada,
+        'status':       'aberto',
+        'criadoEm':     FieldValue.serverTimestamp(),
+        'providerId':   null,
+        'chatId':       null,
+        'valorServico': null,
         'comissaoPaga': false,
       });
+
+      // Notifica todos os profissionais
+      try {
+        await http.post(
+          Uri.parse('https://conectapro-backend-y7oe.onrender.com/pedidos/novo-pedido'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'pedidoId':  docRef.id,
+            'titulo':    _tituloCtrl.text.trim(),
+            'categoria': _categoriaSelecionada ?? '',
+          }),
+        );
+      } catch (_) {
+        // Não bloqueia o pedido se a notificação falhar
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
