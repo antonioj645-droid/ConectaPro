@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../main.dart';
 import 'register_page.dart';
 
@@ -24,6 +26,17 @@ class _LoginPageState extends State<LoginPage> {
   bool loading = false;
   bool obscurePassword = true;
 
+  Future<void> _salvarFcmToken(String uid) async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
+          'fcmToken': token,
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _entrar() async {
     if (emailController.text.isEmpty || senhaController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -35,10 +48,13 @@ class _LoginPageState extends State<LoginPage> {
     try {
       setState(() => loading = true);
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: senhaController.text.trim(),
       );
+
+      // Salva token FCM para receber notificações
+      await _salvarFcmToken(credential.user!.uid);
 
       if (!mounted) return;
 
