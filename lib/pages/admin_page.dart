@@ -52,12 +52,12 @@ class Pedido {
 
 // ───────── TEMA ─────────
 
-const _black   = Color(0xFF000000);
+const _black   = Color(0xFF0A0A0A);
 const _white   = Color(0xFFFFFFFF);
 const _accent  = Color(0xFF276EF1);
-const _surface = Color(0xFFF6F6F6);
+const _surface = Color(0xFFF2F4F8);
 const _card    = Color(0xFFFFFFFF);
-const _grey    = Color(0xFF757575);
+const _grey    = Color(0xFF8A8A8E);
 const _green   = Color(0xFF34C759);
 const _orange  = Color(0xFFFF9500);
 const _red     = Color(0xFFFF3B30);
@@ -89,11 +89,24 @@ class _AdminPageState extends State<AdminPage> {
         backgroundColor: _black,
         foregroundColor: _white,
         elevation: 0,
-        title: const Text('Painel Admin',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+        title: Row(
+          children: [
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: _accent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.admin_panel_settings, color: _white, size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Text('Painel Admin',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
             tooltip: 'Sair',
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -140,69 +153,127 @@ class DashboardTab extends StatelessWidget {
               return const Center(child: CircularProgressIndicator(color: _accent));
             }
 
-            final users     = userSnap.data!.docs.map(AppUser.fromDoc).toList();
+            final users      = userSnap.data!.docs.map(AppUser.fromDoc).toList();
             final pagamentos = paySnap.data!.docs.map(Pagamento.fromDoc).toList();
-            final pedidos   = reqSnap.data!.docs.map(Pedido.fromDoc).toList();
+            final pedidos    = reqSnap.data!.docs.map(Pedido.fromDoc).toList();
 
-            final totalGanhos  = pagamentos.fold<double>(0, (s, p) => s + p.valor);
+            final totalGanhos   = pagamentos.fold<double>(0, (s, p) => s + p.valor);
             final profissionais = users.where((u) => u.role == 'profissional').length;
-            final pendentes    = pedidos.where((p) => p.status == 'pendente').length;
-            final aceitos      = pedidos.where((p) => p.status == 'aceito').length;
-            final concluidos   = pedidos.where((p) => p.status == 'concluido').length;
+            final pendentes     = pedidos.where((p) => p.status == 'pendente').length;
+            final aceitos       = pedidos.where((p) => p.status == 'aceito').length;
+            final concluidos    = pedidos.where((p) => p.status == 'concluido').length;
 
             return ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
               children: [
-                // Saudação
+                // ── Header com gradiente ──
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: _black,
-                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1A1A2E), Color(0xFF276EF1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color.fromRGBO(39, 110, 241, 0.35),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Visão Geral', style: TextStyle(color: _white, fontSize: 18, fontWeight: FontWeight.w800)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Visão Geral',
+                                  style: TextStyle(color: Color(0xFFB0C4FF), fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                              SizedBox(height: 4),
+                              Text('ConectaPro',
+                                  style: TextStyle(color: _white, fontSize: 22, fontWeight: FontWeight.w900)),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color.fromRGBO(255,255,255,0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.trending_up, color: _white, size: 24),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Text('Total em ganhos',
+                          style: TextStyle(color: Color(0xFFB0C4FF), fontSize: 12, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 4),
-                      Text('Total em ganhos: R\$ ${totalGanhos.toStringAsFixed(2)}',
-                          style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13)),
+                      Text('R\$ ${totalGanhos.toStringAsFixed(2)}',
+                          style: const TextStyle(color: _white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _HeaderBadge(label: '${users.length} usuários', icon: Icons.people),
+                          const SizedBox(width: 8),
+                          _HeaderBadge(label: '$profissionais profissionais', icon: Icons.build),
+                          const SizedBox(width: 8),
+                          _HeaderBadge(label: '${pedidos.length} pedidos', icon: Icons.receipt),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-                // Cards métricas
+                // ── Título seção ──
+                const Text('Métricas',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _black)),
+                const SizedBox(height: 12),
+
+                // ── Cards métricas ──
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.6,
+                  childAspectRatio: 1.55,
                   children: [
-                    _MetricCard(label: 'Usuários', value: users.length.toString(), icon: Icons.people, color: _accent),
-                    _MetricCard(label: 'Profissionais', value: profissionais.toString(), icon: Icons.build, color: _green),
-                    _MetricCard(label: 'Pendentes', value: pendentes.toString(), icon: Icons.hourglass_empty, color: _orange),
-                    _MetricCard(label: 'Concluídos', value: concluidos.toString(), icon: Icons.check_circle, color: _green),
-                    _MetricCard(label: 'Em andamento', value: aceitos.toString(), icon: Icons.pending_actions, color: _accent),
-                    _MetricCard(label: 'Total pedidos', value: pedidos.length.toString(), icon: Icons.receipt_long, color: _grey),
+                    _MetricCard(label: 'Usuários', value: users.length.toString(), icon: Icons.people_alt_rounded, color: _accent),
+                    _MetricCard(label: 'Profissionais', value: profissionais.toString(), icon: Icons.construction_rounded, color: _green),
+                    _MetricCard(label: 'Pendentes', value: pendentes.toString(), icon: Icons.hourglass_empty_rounded, color: _orange),
+                    _MetricCard(label: 'Concluídos', value: concluidos.toString(), icon: Icons.check_circle_rounded, color: _green),
+                    _MetricCard(label: 'Em andamento', value: aceitos.toString(), icon: Icons.pending_actions_rounded, color: _accent),
+                    _MetricCard(label: 'Total pedidos', value: pedidos.length.toString(), icon: Icons.receipt_long_rounded, color: _grey),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // Gráfico
+                // ── Gráfico ──
                 if (pagamentos.isNotEmpty) ...[
-                  const Text('Receita por pagamento',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Receita',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: _black)),
+                      Text('${pagamentos.length} registros',
+                          style: const TextStyle(fontSize: 12, color: _grey)),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   Container(
-                    height: 200,
-                    padding: const EdgeInsets.all(16),
+                    height: 220,
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
                     decoration: BoxDecoration(
                       color: _card,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.06), blurRadius: 12, offset: const Offset(0,4))],
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.06), blurRadius: 16, offset: const Offset(0,4))],
                     ),
                     child: _RevenueChart(pagamentos: pagamentos),
                   ),
@@ -211,6 +282,31 @@ class DashboardTab extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _HeaderBadge extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  const _HeaderBadge({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color.fromRGBO(255,255,255,0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: _white, size: 12),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: _white, fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }
@@ -225,32 +321,31 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _card,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.06), blurRadius: 10, offset: const Offset(0,3))],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.06), blurRadius: 12, offset: const Offset(0,4))],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            width: 40, height: 40,
+            width: 38, height: 38,
             decoration: BoxDecoration(
               color: Color.fromRGBO(color.red, color.green, color.blue, 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _black)),
-                Text(label, style: const TextStyle(fontSize: 11, color: _grey)),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: _black, height: 1)),
+              const SizedBox(height: 2),
+              Text(label, style: const TextStyle(fontSize: 12, color: _grey, fontWeight: FontWeight.w500)),
+            ],
           ),
         ],
       ),
@@ -273,12 +368,19 @@ class _RevenueChart extends StatelessWidget {
         valid.length, (i) => FlSpot(i.toDouble(), valid[i].valor));
 
     return LineChart(LineChartData(
-      gridData: FlGridData(show: true, drawVerticalLine: false,
-          getDrawingHorizontalLine: (_) => FlLine(color: const Color(0xFFEEEEEE), strokeWidth: 1)),
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFFF0F0F0), strokeWidth: 1),
+      ),
       borderData: FlBorderData(show: false),
       titlesData: FlTitlesData(
-        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40,
-            getTitlesWidget: (v, _) => Text('R\$${v.toInt()}', style: const TextStyle(fontSize: 10, color: _grey)))),
+        leftTitles: AxisTitles(sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 44,
+          getTitlesWidget: (v, _) => Text('R\$${v.toInt()}',
+              style: const TextStyle(fontSize: 10, color: _grey)),
+        )),
         bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -287,12 +389,20 @@ class _RevenueChart extends StatelessWidget {
         LineChartBarData(
           spots: spots,
           isCurved: true,
+          curveSmoothness: 0.35,
           color: _accent,
           barWidth: 3,
           dotData: FlDotData(show: spots.length <= 10),
           belowBarData: BarAreaData(
             show: true,
-            color: const Color.fromRGBO(39, 110, 241, 0.08),
+            gradient: LinearGradient(
+              colors: [
+                const Color.fromRGBO(39, 110, 241, 0.18),
+                const Color.fromRGBO(39, 110, 241, 0.0),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
         ),
       ],

@@ -1,0 +1,66 @@
+# CORREÇÕES PARA PUBLICAR NA PLAY STORE — ConectaPro
+# Aplique na ordem abaixo antes de gerar o AAB final
+
+## 1. build.gradle.kts
+Destino: android/app/build.gradle.kts
+Mudanças: namespace e applicationId → com.conectapro.app | minifyEnabled = true | shrinkResources = true
+
+## 2. proguard-rules.pro  (ARQUIVO NOVO)
+Destino: android/app/proguard-rules.pro
+Mudanças: arquivo criado do zero, necessário para o minify funcionar com Flutter + Firebase
+
+## 3. AndroidManifest.xml
+Destino: android/app/src/main/AndroidManifest.xml
+Mudanças: android:label="ConectaPro" (maiúsculo), removida referência ao google_maps (não usada)
+
+## 4. MainActivity.kt
+Destino: android/app/src/main/kotlin/com/conectapro/app/MainActivity.kt
+Mudanças: package com.conectapro.app
+ATENÇÃO: apague a pasta antiga  android/app/src/main/kotlin/com/example/  depois de copiar
+
+## 5. MyFirebaseMessagingService.kt
+Destino: android/app/src/main/kotlin/com/conectapro/app/MyFirebaseMessagingService.kt
+Mudanças: package com.conectapro.app
+
+## 6. pubspec.yaml
+Destino: pubspec.yaml (raiz do projeto)
+Mudanças: version: 1.0.1+1 | removido google_maps_flutter (não estava em uso)
+
+## 7. excluir_conta_page.dart
+Destino: lib/pages/excluir_conta_page.dart
+Mudanças: reautenticação Google adicionada; campo senha fica oculto para usuários Google;
+          aviso informativo aparece para usuários Google
+
+---
+
+## APÓS COPIAR OS ARQUIVOS
+
+No CMD, dentro da pasta do projeto:
+
+  flutter clean
+  flutter pub get
+  flutter build appbundle --release
+
+O AAB estará em:
+  build/app/outputs/bundle/release/app-release.aab
+
+---
+
+## O QUE AINDA FALTA FAZER MANUALMENTE (fora dos arquivos)
+
+1. Firebase Console → Authentication → SHA-1 do keystore de release
+   Comando para pegar o SHA-1:
+   keytool -list -v -keystore android/app/conectapro.jks -alias conectapro
+
+2. google-services.json já tem com.conectapro.app cadastrado — OK
+
+3. Play Console:
+   - Criar conta de desenvolvedor (se ainda não tiver) — taxa única de U$25
+   - Criar novo app → "ConectaPro"
+   - Preencher ficha do app: descrição, categoria (Negócios ou Estilo de vida), ícone 512x512, screenshots
+   - Política de privacidade — já tem (politica_privacidade_page.dart), hospedar em URL pública
+   - Declarar permissões: POST_NOTIFICATIONS → explicar por quê
+   - Subir o AAB em "Versão interna" para teste primeiro
+
+4. Versão do app no Firestore (auto-update):
+   Atualizar collection config/app → { versao: "1.0.1", apkUrl: "..." }

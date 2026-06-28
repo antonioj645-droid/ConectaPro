@@ -1,4 +1,4 @@
-package com.example.conectapro
+package com.conectapro.app
 
 import io.flutter.embedding.android.FlutterActivity
 

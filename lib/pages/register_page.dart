@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'termos_de_uso_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -26,6 +27,7 @@ class _RegisterPageState extends State<RegisterPage> {
   String _tipoUsuario    = 'cliente';
   bool   _loading        = false;
   bool   _obscureSenha   = true;
+  bool   _aceitouTermos  = false;
 
   @override
   void dispose() {
@@ -43,6 +45,13 @@ class _RegisterPageState extends State<RegisterPage> {
         _telefoneCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Preencha todos os campos')),
+      );
+      return;
+    }
+
+    if (!_aceitouTermos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Você precisa aceitar os Termos de Uso')),
       );
       return;
     }
@@ -209,7 +218,47 @@ class _RegisterPageState extends State<RegisterPage> {
                     setState(() => _tipoUsuario = value!),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
+
+              // CHECKBOX TERMOS DE USO
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Checkbox(
+                    value: _aceitouTermos,
+                    activeColor: _accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    onChanged: (value) =>
+                        setState(() => _aceitouTermos = value!),
+                  ),
+                  const Text(
+                    'Li e aceito os ',
+                    style: TextStyle(fontSize: 14, color: _textSecondary),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TermosDeUsoPage(),
+                      ),
+                    ),
+                    child: const Text(
+                      'Termos de Uso',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _accent,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                        decorationColor: _accent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
 
               // BOTÃO CRIAR CONTA
               SizedBox(

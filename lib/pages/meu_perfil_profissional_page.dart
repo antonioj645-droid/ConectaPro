@@ -1,8 +1,8 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 class MeuPerfilProfissionalPage extends StatefulWidget {
@@ -29,11 +29,12 @@ class _MeuPerfilProfissionalPageState
   final _categoriaCtrl = TextEditingController();
   final _bioCtrl       = TextEditingController();
 
-  String _fotoUrl    = '';
-  bool   _carregando = true;
-  bool   _salvando   = false;
+  String _fotoUrl      = '';
+  String _fotoBase64   = '';
+  bool   _carregando   = true;
+  bool   _salvando     = false;
   bool   _enviandoFoto = false;
-  bool   _verificado = false;
+  bool   _verificado   = false;
 
   Uint8List? _fotoBytes;
 
@@ -63,12 +64,18 @@ class _MeuPerfilProfissionalPageState
 
     if (doc.exists) {
       final data = doc.data()!;
-      _nomeCtrl.text      = data['nome']        ?? '';
-      _telefoneCtrl.text  = data['telefone']    ?? '';
-      _categoriaCtrl.text = data['categoria']   ?? data['especialidade'] ?? '';
-      _bioCtrl.text       = data['bio']         ?? data['descricao'] ?? '';
-      _fotoUrl            = data['fotoUrl']     ?? data['photoUrl'] ?? '';
-      _verificado         = data['verificado']  ?? false;
+      _nomeCtrl.text      = data['nome']       ?? '';
+      _telefoneCtrl.text  = data['telefone']   ?? '';
+      _categoriaCtrl.text = data['categoria']  ?? data['especialidade'] ?? '';
+      _bioCtrl.text       = data['bio']        ?? data['descricao'] ?? '';
+      _fotoUrl            = data['fotoUrl']    ?? data['photoUrl'] ?? '';
+      _fotoBase64         = data['fotoBase64'] ?? '';
+      _verificado         = data['verificado'] ?? false;
+
+      // Se tem base64 salvo, carrega como bytes
+      if (_fotoBase64.isNotEmpty) {
+        _fotoBytes = base64Decode(_fotoBase64);
+      }
     }
 
     setState(() => _carregando = false);
@@ -78,13 +85,27 @@ class _MeuPerfilProfissionalPageState
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 600,
-      maxHeight: 600,
-      imageQuality: 80,
+      maxWidth: 400,
+      maxHeight: 400,
+      imageQuality: 60,
     );
     if (picked == null) return;
 
     final bytes = await picked.readAsBytes();
+
+    // Verifica tamanho — Firestore suporta até ~1MB por campo
+    if (bytes.lengthInBytes > 900000) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Foto muito grande! Escolha uma menor.'),
+            backgroundColor: _red,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _fotoBytes    = bytes;
       _enviandoFoto = true;
@@ -92,20 +113,14 @@ class _MeuPerfilProfissionalPageState
 
     try {
       final user = FirebaseAuth.instance.currentUser!;
-      final ref  = FirebaseStorage.instance
-          .ref()
-          .child('fotos_perfil')
-          .child('${user.uid}.jpg');
-
-      await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-      final url = await ref.getDownloadURL();
+      final base64Str = base64Encode(bytes);
 
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .update({'fotoUrl': url});
+          .update({'fotoBase64': base64Str});
 
-      setState(() => _fotoUrl = url);
+      setState(() => _fotoBase64 = base64Str);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -116,6 +131,7 @@ class _MeuPerfilProfissionalPageState
         );
       }
     } catch (e) {
+      setState(() => _fotoBytes = null);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -168,6 +184,12 @@ class _MeuPerfilProfissionalPageState
     }
   }
 
+  ImageProvider? get _imagemAtual {
+    if (_fotoBytes != null) return MemoryImage(_fotoBytes!);
+    if (_fotoUrl.isNotEmpty) return NetworkImage(_fotoUrl);
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -191,7 +213,6 @@ class _MeuPerfilProfissionalPageState
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
 
-                  // ── Badge verificado ────────────────────────────────────
                   if (_verificado)
                     Container(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -227,13 +248,11 @@ class _MeuPerfilProfissionalPageState
                       ),
                     ),
 
-                  // ── Progresso para verificação (se não verificado) ──────
                   if (!_verificado)
                     _buildProgressoVerificacao(user?.uid ?? ''),
 
                   const SizedBox(height: 16),
 
-                  // ── Foto de perfil ──────────────────────────────────────
                   GestureDetector(
                     onTap: _enviandoFoto ? null : _escolherFoto,
                     child: Stack(
@@ -242,12 +261,8 @@ class _MeuPerfilProfissionalPageState
                         CircleAvatar(
                           radius: 60,
                           backgroundColor: _accent.withOpacity(0.1),
-                          backgroundImage: _fotoBytes != null
-                              ? MemoryImage(_fotoBytes!)
-                              : (_fotoUrl.isNotEmpty
-                                  ? NetworkImage(_fotoUrl)
-                                  : null) as ImageProvider?,
-                          child: (_fotoBytes == null && _fotoUrl.isEmpty)
+                          backgroundImage: _imagemAtual,
+                          child: _imagemAtual == null
                               ? Text(
                                   _nomeCtrl.text.isNotEmpty
                                       ? _nomeCtrl.text[0].toUpperCase()
@@ -288,7 +303,6 @@ class _MeuPerfilProfissionalPageState
 
                   const SizedBox(height: 28),
 
-                  // ── Campos ──────────────────────────────────────────────
                   _campo(
                     controller: _nomeCtrl,
                     label: 'Nome completo',
@@ -318,7 +332,6 @@ class _MeuPerfilProfissionalPageState
 
                   const SizedBox(height: 28),
 
-                  // ── Botão salvar ────────────────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -349,7 +362,6 @@ class _MeuPerfilProfissionalPageState
 
                   const SizedBox(height: 32),
 
-                  // ── Avaliações recebidas ────────────────────────────────
                   _buildAvaliacoes(user?.uid ?? ''),
                 ],
               ),
@@ -357,7 +369,6 @@ class _MeuPerfilProfissionalPageState
     );
   }
 
-  // ── Barra de progresso para verificação ──────────────────────────────────
   Widget _buildProgressoVerificacao(String uid) {
     if (uid.isEmpty) return const SizedBox();
 

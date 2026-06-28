@@ -38,6 +38,135 @@ class MeusPedidosPage extends StatelessWidget {
     }
   }
 
+  Future<void> _cancelarPedido(BuildContext context, String pedidoId) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Cancelar pedido',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'Tem certeza que deseja cancelar este pedido?\nO profissional será notificado.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Voltar',
+                style: TextStyle(color: Color(0xFF757575))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF3B30),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancelar pedido',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('requests')
+          .doc(pedidoId)
+          .update({
+        'status': 'cancelado',
+        'canceladoEm': FieldValue.serverTimestamp(),
+        'providerId': '',
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pedido cancelado com sucesso.'),
+            backgroundColor: Color(0xFFFF3B30),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao cancelar: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _marcarConcluido(BuildContext context, String pedidoId) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Confirmar conclusão',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'O serviço foi executado e você está satisfeito?\nIsso liberará o pagamento ao profissional.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Voltar',
+                style: TextStyle(color: Color(0xFF757575))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF34C759),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('requests')
+          .doc(pedidoId)
+          .update({
+        'status': 'concluido',
+        'concluidoEm': FieldValue.serverTimestamp(),
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Serviço marcado como concluído! ✅'),
+            backgroundColor: Color(0xFF34C759),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
+      }
+    }
+  }
+
   void _abrirAvaliacao(BuildContext context, String pedidoId, String providerId) {
     int _estrelas = 0;
     final _comentarioCtrl = TextEditingController();
@@ -110,7 +239,6 @@ class MeusPedidosPage extends StatelessWidget {
                   ? null
                   : () async {
                       try {
-                        // Salva avaliação no pedido
                         await FirebaseFirestore.instance
                             .collection('requests')
                             .doc(pedidoId)
@@ -120,7 +248,6 @@ class MeusPedidosPage extends StatelessWidget {
                           'avaliadoEm': FieldValue.serverTimestamp(),
                         });
 
-                        // Atualiza média e verifica badge
                         final userRef = FirebaseFirestore.instance
                             .collection('users')
                             .doc(providerId);
@@ -139,7 +266,6 @@ class MeusPedidosPage extends StatelessWidget {
                           final novaSoma  = somaAval + _estrelas;
                           final novaMedia = novaSoma / novoTotal;
 
-                          // ✅ Badge automático: 5+ avaliações com média >= 4.5
                           final deveSerVerificado =
                               novoTotal >= 5 && novaMedia >= 4.5;
 
@@ -347,10 +473,10 @@ class MeusPedidosPage extends StatelessWidget {
                             ),
                           ),
 
-                          // Valor
-                          if (valorServico != null)
+                          // Valor + aviso de pagamento
+                          if (valorServico != null) ...[
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                               child: Row(
                                 children: [
                                   const Icon(Icons.attach_money,
@@ -366,6 +492,36 @@ class MeusPedidosPage extends StatelessWidget {
                                 ],
                               ),
                             ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF3E0),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: _orange.withOpacity(0.4)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.info_outline,
+                                        size: 15, color: _orange),
+                                    SizedBox(width: 7),
+                                    Expanded(
+                                      child: Text(
+                                        'Faça o pagamento depois do serviço executado',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: _orange,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
 
                           // Média do profissional + badge verificado
                           if (providerId.isNotEmpty && status != 'aberto')
@@ -408,7 +564,6 @@ class MeusPedidosPage extends StatelessWidget {
                                               fontSize: 12,
                                               color: _textSecondary,
                                               fontWeight: FontWeight.w500)),
-                                      // ✅ Badge verificado
                                       if (verificado) ...[
                                         const SizedBox(width: 6),
                                         Container(
@@ -417,8 +572,8 @@ class MeusPedidosPage extends StatelessWidget {
                                           decoration: BoxDecoration(
                                             gradient: const LinearGradient(
                                               colors: [
-                                                Color(0xFFFFCC00),
-                                                Color(0xFFFF9500)
+                                                Color(0xFF34C759),
+                                                Color(0xFF27A84A),
                                               ],
                                             ),
                                             borderRadius:
@@ -493,6 +648,7 @@ class MeusPedidosPage extends StatelessWidget {
                             child: Column(
                               children: [
 
+                                // Botão chat
                                 if (status == 'aceito')
                                   SizedBox(
                                     width: double.infinity,
@@ -520,6 +676,58 @@ class MeusPedidosPage extends StatelessWidget {
                                     ),
                                   ),
 
+                                // Botão concluir serviço
+                                if (status == 'aceito') ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 44,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _green,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12)),
+                                        elevation: 0,
+                                      ),
+                                      icon: const Icon(Icons.check_circle_outline,
+                                          size: 16, color: _white),
+                                      label: const Text('Serviço concluído',
+                                          style: TextStyle(
+                                              color: _white,
+                                              fontWeight: FontWeight.w700)),
+                                      onPressed: () =>
+                                          _marcarConcluido(context, pedidoId),
+                                    ),
+                                  ),
+                                ],
+
+                                // Botão cancelar
+                                if (status == 'aceito' || status == 'aberto' || status == 'pendente' || status == 'open') ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 44,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: _red,
+                                        side: const BorderSide(color: _red),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12)),
+                                      ),
+                                      icon: const Icon(Icons.cancel_outlined,
+                                          size: 16),
+                                      label: const Text('Cancelar pedido',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w700)),
+                                      onPressed: () =>
+                                          _cancelarPedido(context, pedidoId),
+                                    ),
+                                  ),
+                                ],
+
+                                // Ver perfil profissional
                                 if (providerId.isNotEmpty &&
                                     status != 'aberto') ...[
                                   const SizedBox(height: 8),
@@ -552,6 +760,7 @@ class MeusPedidosPage extends StatelessWidget {
                                   ),
                                 ],
 
+                                // Avaliar profissional
                                 if (status == 'concluido' &&
                                     avaliacao == null &&
                                     providerId.isNotEmpty) ...[

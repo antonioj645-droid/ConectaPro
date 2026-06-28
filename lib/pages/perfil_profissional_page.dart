@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -47,14 +49,26 @@ class PerfilProfissionalPage extends StatelessWidget {
           }
 
           final data = snap.data!.data() as Map<String, dynamic>;
-          final nome  = data['nome'] ?? data['email'] ?? 'Profissional';
-          final email = data['email'] ?? '';
-          final telefone = data['telefone'] ?? '';
+          final nome      = data['nome'] ?? data['email'] ?? 'Profissional';
+          final email     = data['email'] ?? '';
+          final telefone  = data['telefone'] ?? '';
           final categoria = data['categoria'] ?? data['especialidade'] ?? '';
-          final bio = data['bio'] ?? data['descricao'] ?? '';
-          final media = ((data['mediaAvaliacao'] ?? 0) as num).toDouble();
-          final total = ((data['totalAvaliacoes'] ?? 0) as num).toInt();
-          final fotoUrl = data['fotoUrl'] ?? data['photoUrl'] ?? '';
+          final bio       = data['bio'] ?? data['descricao'] ?? '';
+          final media     = ((data['mediaAvaliacao'] ?? 0) as num).toDouble();
+          final total     = ((data['totalAvaliacoes'] ?? 0) as num).toInt();
+          final fotoUrl   = data['fotoUrl'] ?? data['photoUrl'] ?? '';
+          final fotoBase64 = data['fotoBase64'] ?? '';
+
+          // Resolve a imagem: base64 tem prioridade, depois URL
+          ImageProvider? imagemFoto;
+          if (fotoBase64.isNotEmpty) {
+            try {
+              final bytes = base64Decode(fotoBase64);
+              imagemFoto = MemoryImage(bytes);
+            } catch (_) {}
+          } else if (fotoUrl.isNotEmpty) {
+            imagemFoto = NetworkImage(fotoUrl);
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -65,9 +79,8 @@ class PerfilProfissionalPage extends StatelessWidget {
                 CircleAvatar(
                   radius: 50,
                   backgroundColor: _accent.withOpacity(0.1),
-                  backgroundImage:
-                      fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
-                  child: fotoUrl.isEmpty
+                  backgroundImage: imagemFoto,
+                  child: imagemFoto == null
                       ? Text(
                           nome.isNotEmpty ? nome[0].toUpperCase() : 'P',
                           style: const TextStyle(
@@ -234,10 +247,10 @@ class PerfilProfissionalPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             ...docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final nota = (data['avaliacao'] as num).toInt();
+              final data       = doc.data() as Map<String, dynamic>;
+              final nota       = (data['avaliacao'] as num).toInt();
               final comentario = data['comentario'] ?? '';
-              final titulo = data['titulo'] ?? data['descricao'] ?? 'Serviço';
+              final titulo     = data['titulo'] ?? data['descricao'] ?? 'Serviço';
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(14),

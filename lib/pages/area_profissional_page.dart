@@ -1,23 +1,25 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import 'chat_page.dart';
 import 'pix_dialog.dart';
 import 'meus_servicos_page.dart';
 import 'historico_servicos_page.dart';
-import 'meu_perfil_profissional_page.dart';
 
 class AreaProfissionalPage extends StatefulWidget {
   AreaProfissionalPage({Key? key}) : super(key: key);
+
   @override
   State<AreaProfissionalPage> createState() => _AreaProfissionalPageState();
 }
 
 class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
+  // ─── Tema ──────────────────────────────────────────────────────────────────
   static const _black         = Color(0xFF000000);
   static const _white         = Color(0xFFFFFFFF);
   static const _accent        = Color(0xFF276EF1);
@@ -25,55 +27,21 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
   static const _textSecondary = Color(0xFF757575);
 
   final Set<String> _processandoPedidos = {};
-  final Set<String> _pedidosConhecidos   = {};
-  bool _inicializado = false;
-
-  final FlutterLocalNotificationsPlugin _localNotif =
-      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
     super.initState();
-    _initNotificacoes();
-    _atualizarLocalizacao();
+    _salvarLocalizacao();
   }
 
-  Future<void> _initNotificacoes() async {
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: android);
-    await _localNotif.initialize(settings);
-  }
-
-  Future<void> _mostrarNotificacao(String titulo, String corpo) async {
-    const android = AndroidNotificationDetails(
-      'pedidos_channel',
-      'Novos Pedidos',
-      channelDescription: 'Notifica��es de novos pedidos dispon�veis',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-      icon: '@mipmap/ic_launcher',
-    );
-    const details = NotificationDetails(android: android);
-    await _localNotif.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      titulo,
-      corpo,
-      details,
-    );
-  }
-
-  Future<void> _atualizarLocalizacao() async {
+  // ─── Localização ───────────────────────────────────────────────────────────
+  Future<void> _salvarLocalizacao() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        final permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) return;
-      }
+      final permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) return;
       final pos = await Geolocator.getCurrentPosition();
       await FirebaseFirestore.instance
           .collection('users')
@@ -82,6 +50,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     } catch (_) {}
   }
 
+  // ─── Desbloquear pedido ────────────────────────────────────────────────────
   Future<void> _desbloquearPedido(String pedidoId, String? chatId) async {
     if (_processandoPedidos.contains(pedidoId)) return;
     setState(() => _processandoPedidos.add(pedidoId));
@@ -93,25 +62,6 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     }
 
     try {
-      final ativoSnap = await FirebaseFirestore.instance
-          .collection('requests')
-          .where('providerId', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'aceito')
-          .limit(1)
-          .get();
-
-      if (ativoSnap.docs.isNotEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Finalize seu servi�o atual antes de aceitar outro.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-
       final docUser = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -119,6 +69,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
       final saldo = ((docUser.data()?['balance'] ?? 0) as num).toDouble();
 
+      // Saldo insuficiente → abre PIX para adicionar saldo
       if (saldo < 3) {
         setState(() => _processandoPedidos.remove(pedidoId));
         if (!mounted) return;
@@ -145,15 +96,17 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
       final data = jsonDecode(response.body);
 
       if (data['success'] == true) {
-        final pedidoAtualizado = await FirebaseFirestore.instance
+        await FirebaseFirestore.instance
             .collection('requests')
             .doc(pedidoId)
-            .get();
+            .update({
+          'providerId': user.uid,
+          'status': 'aceito',
+          'acceptedAt': FieldValue.serverTimestamp(),
+        });
 
         final chatFinal =
-            (pedidoAtualizado.data()?['chatId'] as String?)?.isNotEmpty == true
-                ? pedidoAtualizado.data()!['chatId'] as String
-                : (chatId != null && chatId.isNotEmpty ? chatId : pedidoId);
+            (chatId != null && chatId.isNotEmpty) ? chatId : pedidoId;
 
         if (!mounted) return;
         Navigator.push(
@@ -177,12 +130,13 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     }
   }
 
+  // ─── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return const Scaffold(body: Center(child: Text('N�o logado')));
+      return const Scaffold(body: Center(child: Text('Não logado')));
     }
 
     return Scaffold(
@@ -196,7 +150,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Pedidos dispon�veis',
+                'Pedidos disponíveis',
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -210,66 +164,20 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     );
   }
 
+  // ─── AppBar ────────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: _black,
       foregroundColor: _white,
       elevation: 0,
-      title: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('requests')
-            .where('status', whereIn: ['aberto', 'pendente', 'open'])
-            .snapshots(),
-        builder: (context, snap) {
-          final total = snap.data?.docs ?? [];
-          final novos = total.where((d) {
-            final data = d.data() as Map<String, dynamic>;
-            final pid = data['providerId'];
-            return pid == null || pid.toString().isEmpty;
-          }).length;
-
-          return Row(
-            children: [
-              const Text(
-                'Painel Profissional',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-              ),
-              if (novos > 0) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF3B30),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$novos',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          );
-        },
+      title: const Text(
+        'Painel Profissional',
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.person_outline),
-          tooltip: 'Meu perfil',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => MeuPerfilProfissionalPage()),
-          ),
-        ),
-        IconButton(
           icon: const Icon(Icons.history_outlined),
-          tooltip: 'Hist�rico',
+          tooltip: 'Histórico',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => HistoricoServicosPage()),
@@ -277,12 +185,13 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         ),
         IconButton(
           icon: const Icon(Icons.work_outline),
-          tooltip: 'Meus servi�os',
+          tooltip: 'Meus serviços',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => MeusServicosPage()),
           ),
         ),
+        // ✅ Abre PixDialog sem valor — profissional digita o valor lá dentro
         IconButton(
           icon: const Icon(Icons.account_balance_wallet_outlined),
           tooltip: 'Adicionar saldo',
@@ -304,6 +213,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     );
   }
 
+  // ─── Banner de saldo ───────────────────────────────────────────────────────
   Widget _buildSaldoBanner(User user) {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -312,16 +222,10 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           .snapshots(),
       builder: (context, snap) {
         double saldo = 0;
-        double mediaAvaliacao = 0;
-        int totalAvaliacoes = 0;
-
         if (snap.hasData && snap.data!.exists) {
           final d = snap.data!.data() as Map<String, dynamic>;
           saldo = ((d['balance'] ?? 0) as num).toDouble();
-          mediaAvaliacao = ((d['mediaAvaliacao'] ?? 0) as num).toDouble();
-          totalAvaliacoes = ((d['totalAvaliacoes'] ?? 0) as num).toInt();
         }
-
         return Container(
           color: _black,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -330,34 +234,12 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
               const Icon(Icons.account_balance_wallet,
                   color: _accent, size: 20),
               const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Saldo: R\$ ${saldo.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        color: _white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  if (mediaAvaliacao > 0)
-                    Row(
-                      children: [
-                        const Icon(Icons.star,
-                            size: 13, color: Color(0xFFFFCC00)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${mediaAvaliacao.toStringAsFixed(1)} '
-                          '($totalAvaliacoes avalia��es)',
-                          style: const TextStyle(
-                            color: Color(0xFFCCCCCC),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
+              Text(
+                'Saldo: R\$ ${saldo.toStringAsFixed(2)}',
+                style: const TextStyle(
+                    color: _white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               if (saldo < 3)
@@ -389,125 +271,88 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     );
   }
 
+  // ─── Lista de pedidos ──────────────────────────────────────────────────────
   Widget _buildListaPedidos(User user) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('requests')
-          .where('providerId', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'aceito')
-          .limit(1)
+          .where('status', isEqualTo: 'pendente')
+          .orderBy('createdAt', descending: true)
           .snapshots(),
-      builder: (context, snapAtivo) {
-        final temServicoAtivo = (snapAtivo.data?.docs ?? []).isNotEmpty;
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: _accent));
+        }
 
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('requests')
-              .where('status', whereIn: ['aberto', 'pendente', 'open'])
-              .snapshots(),
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(
-                  child: CircularProgressIndicator(color: _accent));
-            }
+        if (snap.hasError) {
+          return Center(
+              child: Text('Erro: ${snap.error}',
+                  style: const TextStyle(color: Colors.red)));
+        }
 
-            if (snap.hasError) {
-              return Center(
-                  child: Text('Erro: ${snap.error}',
-                      style: const TextStyle(color: Colors.red)));
-            }
+        final docs = snap.data?.docs ?? [];
 
-            final docs = snap.data?.docs ?? [];
+        // Verifica se o profissional já tem serviço ativo
+        final temServicoAtivo = docs.any((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return data['providerId'] == user.uid &&
+              data['status'] == 'aceito';
+        });
 
-            final pedidos = docs.where((d) {
-              final data = d.data() as Map<String, dynamic>;
-              final pid = data['providerId'];
-              return pid == null || pid.toString().isEmpty;
-            }).toList();
+        // Filtra apenas pedidos sem profissional
+        final pedidos = docs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return data['providerId'] == null ||
+              (data['providerId'] as String).isEmpty;
+        }).toList();
 
-            // ? Detecta pedidos novos e dispara notifica��o local
-            if (_inicializado) {
-              for (final doc in pedidos) {
-                if (!_pedidosConhecidos.contains(doc.id)) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final titulo = data['titulo'] ?? data['title'] ?? 'Novo servi�o';
-                  final categoria = data['categoria'] ?? '';
-                  final corpo = categoria.isNotEmpty
-                      ? '$categoria � $titulo'
-                      : titulo;
-                  _mostrarNotificacao('?? Novo pedido dispon�vel!', corpo);
-                }
-              }
-            }
+        if (pedidos.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.inbox_outlined, size: 56, color: _textSecondary),
+                SizedBox(height: 12),
+                Text('Nenhum pedido disponível',
+                    style: TextStyle(
+                        fontSize: 16,
+                        color: _textSecondary,
+                        fontWeight: FontWeight.w500)),
+                SizedBox(height: 4),
+                Text('Novos pedidos aparecerão aqui automaticamente.',
+                    style: TextStyle(fontSize: 13, color: _textSecondary)),
+              ],
+            ),
+          );
+        }
 
-            // Atualiza set de pedidos conhecidos
-            _pedidosConhecidos.clear();
-            for (final doc in pedidos) {
-              _pedidosConhecidos.add(doc.id);
-            }
-            if (!_inicializado) {
-              Future.microtask(() {
-                if (mounted) setState(() => _inicializado = true);
-              });
-            }
-
-            pedidos.sort((a, b) {
-              final dataA = (a.data() as Map)['criadoEm'] ??
-                  (a.data() as Map)['createdAt'];
-              final dataB = (b.data() as Map)['criadoEm'] ??
-                  (b.data() as Map)['createdAt'];
-              if (dataA == null || dataB == null) return 0;
-              return dataB.compareTo(dataA);
-            });
-
-            if (pedidos.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.inbox_outlined,
-                        size: 56, color: _textSecondary),
-                    SizedBox(height: 12),
-                    Text('Nenhum pedido dispon�vel',
-                        style: TextStyle(
-                            fontSize: 16,
-                            color: _textSecondary,
-                            fontWeight: FontWeight.w500)),
-                    SizedBox(height: 4),
-                    Text('Novos pedidos aparecer�o aqui automaticamente.',
-                        style:
-                            TextStyle(fontSize: 13, color: _textSecondary)),
-                  ],
-                ),
-              );
-            }
-
-            return RefreshIndicator(
-              color: _accent,
-              onRefresh: () async => setState(() {}),
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                itemCount: pedidos.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final doc  = pedidos[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  return _buildCardPedido(doc.id, data, temServicoAtivo);
-                },
-              ),
-            );
-          },
+        return RefreshIndicator(
+          color: _accent,
+          onRefresh: () async => setState(() {}),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            itemCount: pedidos.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final doc  = pedidos[index];
+              final data = doc.data() as Map<String, dynamic>;
+              return _buildCardPedido(
+                  doc.id, data, temServicoAtivo);
+            },
+          ),
         );
       },
     );
   }
 
+  // ─── Card de pedido ────────────────────────────────────────────────────────
   Widget _buildCardPedido(
       String pedidoId, Map<String, dynamic> data, bool temServicoAtivo) {
-    final titulo    = data['titulo'] ?? data['title'] ?? data['description'] ?? 'Servi�o sem t�tulo';
+    final titulo    = data['titulo'] ?? data['title'] ?? 'Serviço sem título';
     final descricao = data['descricao'] ?? data['description'] ?? '';
     final categoria = data['categoria'] ?? data['category'] ?? '';
-    final endereco  = data['endereco'] ?? data['bairro'] ?? data['neighborhood'] ?? '';
+    final bairro    = data['bairro'] ?? data['neighborhood'] ?? '';
     final chatId    = data['chatId'] as String?;
     final isProcessando = _processandoPedidos.contains(pedidoId);
 
@@ -526,6 +371,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Cabeçalho
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
@@ -563,13 +409,13 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                     ],
                   ),
                 ),
-                if (endereco.isNotEmpty)
+                if (bairro.isNotEmpty)
                   Row(
                     children: [
                       const Icon(Icons.location_on_outlined,
                           size: 13, color: _textSecondary),
                       const SizedBox(width: 2),
-                      Text(endereco,
+                      Text(bairro,
                           style: const TextStyle(
                               fontSize: 12, color: _textSecondary)),
                     ],
@@ -578,8 +424,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             ),
           ),
 
-          const Divider(
-              color: Color(0xFFE5E5E5), height: 1, indent: 16, endIndent: 16),
+          const Divider(color: Color(0xFFE5E5E5), height: 1, indent: 16, endIndent: 16),
 
           if (descricao.isNotEmpty)
             Padding(
@@ -593,6 +438,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
               ),
             ),
 
+          // Aviso serviço ativo
           if (temServicoAtivo)
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -602,7 +448,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                       size: 14, color: Color(0xFFFF9500)),
                   SizedBox(width: 6),
                   Text(
-                    'Finalize seu servi�o atual primeiro',
+                    'Finalize seu serviço atual primeiro',
                     style: TextStyle(
                         fontSize: 12,
                         color: Color(0xFFFF9500),
@@ -612,6 +458,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
               ),
             ),
 
+          // Botão aceitar
           Padding(
             padding: const EdgeInsets.all(16),
             child: SizedBox(

@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'package:http/http.dart' as http;
 
 class ChatPage extends StatefulWidget {
@@ -22,14 +20,13 @@ class _ChatPageState extends State<ChatPage> {
   static const _surface       = Color(0xFFF6F6F6);
   static const _textSecondary = Color(0xFF757575);
 
-  final TextEditingController _msgCtrl   = TextEditingController();
-  final TextEditingController _valorCtrl = TextEditingController();
-  final ScrollController _scrollCtrl     = ScrollController();
+  final TextEditingController _msgCtrl    = TextEditingController();
+  final TextEditingController _valorCtrl  = TextEditingController();
+  final ScrollController      _scrollCtrl = ScrollController();
 
-  bool _enviando     = false;
-  bool _finalizando  = false;
+  bool _enviando    = false;
+  bool _finalizando = false;
 
-  // ─── Enviar mensagem normal ───────────────────────────────────────────────
   Future<void> _enviarMensagem() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -60,7 +57,6 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  // ─── Profissional define o valor ─────────────────────────────────────────
   Future<void> _definirValor(String pedidoId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -98,13 +94,11 @@ class _ChatPageState extends State<ChatPage> {
                   _valorCtrl.text.trim().replaceAll(',', '.'));
               if (valor == null || valor <= 0) return;
 
-              // Salva valor no pedido
               await FirebaseFirestore.instance
                   .collection('requests')
                   .doc(pedidoId)
                   .update({'valorServico': valor});
 
-              // Envia mensagem especial no chat
               await FirebaseFirestore.instance
                   .collection('chats')
                   .doc(widget.chatId)
@@ -128,11 +122,9 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  // ─── Finalizar serviço (cobra 7% via backend) ────────────────────────────
   Future<void> _finalizarServico(String pedidoId, double valorServico) async {
     final comissao = valorServico * 0.07;
 
-    // Confirmar
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -180,7 +172,6 @@ class _ChatPageState extends State<ChatPage> {
     setState(() => _finalizando = true);
 
     try {
-      // ✅ Chama backend — validação de saldo e comissão acontece com segurança
       final uri = Uri.https(
         'conectapro-backend-1.onrender.com',
         '/pedidos/finalizar-servico/$pedidoId',
@@ -197,7 +188,6 @@ class _ChatPageState extends State<ChatPage> {
         throw Exception(data['erro'] ?? 'Erro ao finalizar');
       }
 
-      // Mensagem de conclusão no chat
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(widget.chatId)
@@ -224,10 +214,10 @@ class _ChatPageState extends State<ChatPage> {
         SnackBar(
           content: Text(
             e.toString().contains('Saldo insuficiente')
-              ? '💰 Saldo insuficiente! Adicione créditos na carteira para finalizar.'
-              : e.toString().contains('Valor do serviço não definido')
-                ? '⚠️ Defina o valor do serviço antes de finalizar.'
-                : 'Erro ao finalizar: $e',
+                ? '💰 Saldo insuficiente! Adicione créditos na carteira.'
+                : e.toString().contains('Valor do serviço não definido')
+                    ? '⚠️ Defina o valor do serviço antes de finalizar.'
+                    : 'Erro ao finalizar: $e',
           ),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 4),
@@ -270,6 +260,7 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _msgCtrl.dispose();
     _valorCtrl.dispose();
+    _scrollCtrl.dispose();
     FirebaseFirestore.instance
         .collection('chats')
         .doc(widget.chatId)
@@ -279,10 +270,13 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user        = FirebaseAuth.instance.currentUser;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPad   = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: _surface,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: _black,
         foregroundColor: _white,
@@ -291,7 +285,6 @@ class _ChatPageState extends State<ChatPage> {
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        // Busca o pedido vinculado ao chatId
         stream: FirebaseFirestore.instance
             .collection('requests')
             .where('chatId', isEqualTo: widget.chatId)
@@ -301,14 +294,13 @@ class _ChatPageState extends State<ChatPage> {
             .where((d) => d != null)
             .cast<DocumentSnapshot>(),
         builder: (context, snapPedido) {
-          final pedidoData =
-              snapPedido.data?.data() as Map<String, dynamic>?;
-          final pedidoId      = snapPedido.data?.id;
-          final valorServico  = (pedidoData?['valorServico'] as num?)?.toDouble();
-          final status        = pedidoData?['status'] ?? 'aberto';
-          final providerId    = pedidoData?['providerId'] ?? '';
+          final pedidoData     = snapPedido.data?.data() as Map<String, dynamic>?;
+          final pedidoId       = snapPedido.data?.id;
+          final valorServico   = (pedidoData?['valorServico'] as num?)?.toDouble();
+          final status         = pedidoData?['status'] ?? 'aberto';
+          final providerId     = pedidoData?['providerId'] ?? '';
           final isProfissional = user?.uid == providerId;
-          final isConcluido   = status == 'concluido';
+          final isConcluido    = status == 'concluido';
 
           return Column(
             children: [
@@ -321,8 +313,7 @@ class _ChatPageState extends State<ChatPage> {
                       horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.attach_money,
-                          color: _green, size: 20),
+                      const Icon(Icons.attach_money, color: _green, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Valor do serviço: R\$ ${valorServico.toStringAsFixed(2)}',
@@ -348,20 +339,19 @@ class _ChatPageState extends State<ChatPage> {
                       SizedBox(width: 8),
                       Text('Serviço concluído ✅',
                           style: TextStyle(
-                              color: _green,
-                              fontWeight: FontWeight.w700)),
+                              color: _green, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
 
-              // ─── Digitando ─────────────────────────────────────────────
+              // ─── Indicador "Digitando..." ───────────────────────────────
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('chats')
                     .doc(widget.chatId)
                     .snapshots(),
                 builder: (_, snap) {
-                  final d = snap.data?.data() as Map<String, dynamic>?;
+                  final d      = snap.data?.data() as Map<String, dynamic>?;
                   final typing = d?['typing'];
                   if (typing != null && typing != user?.uid) {
                     return const Padding(
@@ -379,7 +369,7 @@ class _ChatPageState extends State<ChatPage> {
                 },
               ),
 
-              // ─── Mensagens ─────────────────────────────────────────────
+              // ─── Lista de mensagens ─────────────────────────────────────
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -391,8 +381,7 @@ class _ChatPageState extends State<ChatPage> {
                   builder: (context, snap) {
                     if (!snap.hasData) {
                       return const Center(
-                          child: CircularProgressIndicator(
-                              color: _accent));
+                          child: CircularProgressIndicator(color: _accent));
                     }
 
                     final docs = snap.data!.docs;
@@ -404,24 +393,21 @@ class _ChatPageState extends State<ChatPage> {
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                       itemCount: docs.length,
                       itemBuilder: (context, i) {
-                        final data =
-                            docs[i].data() as Map<String, dynamic>;
+                        final data = docs[i].data() as Map<String, dynamic>;
                         final isMe = data['senderId'] == user?.uid;
                         final tipo = data['tipo'] ?? 'texto';
 
                         // Mensagem de sistema
                         if (tipo == 'sistema') {
                           return Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Center(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFE8F5E9),
-                                  borderRadius:
-                                      BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   data['text'] ?? '',
@@ -438,16 +424,14 @@ class _ChatPageState extends State<ChatPage> {
                         // Mensagem de valor proposto
                         if (tipo == 'valor_proposto') {
                           return Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 6),
+                            padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Center(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 12),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFFF8E1),
-                                  borderRadius:
-                                      BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                       color: Colors.amber.shade300),
                                 ),
@@ -465,13 +449,26 @@ class _ChatPageState extends State<ChatPage> {
                                           fontWeight: FontWeight.w800,
                                           color: _green),
                                     ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      'Pagamento combinado fora do app',
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          color: _textSecondary),
-                                    ),
+                                    // Aviso de segurança: apenas para o cliente
+                                    if (!isProfissional) ...[
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        '🔒 Aviso de Segurança',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.red),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Nunca realize pagamentos antecipados. Efetue o pagamento diretamente ao profissional somente após a conclusão do serviço e a confirmação de que tudo foi realizado conforme o combinado. Essa prática ajuda a prevenir fraudes e garante mais segurança para ambas as partes.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.red,
+                                            fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -485,31 +482,24 @@ class _ChatPageState extends State<ChatPage> {
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
                           child: Container(
-                            margin: const EdgeInsets.symmetric(
-                                vertical: 3),
+                            margin: const EdgeInsets.symmetric(vertical: 3),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 10),
                             constraints: BoxConstraints(
                               maxWidth:
-                                  MediaQuery.of(context).size.width *
-                                      0.72,
+                                  MediaQuery.of(context).size.width * 0.72,
                             ),
                             decoration: BoxDecoration(
                               color: isMe ? _black : _white,
                               borderRadius: BorderRadius.only(
-                                topLeft:
-                                    const Radius.circular(16),
-                                topRight:
-                                    const Radius.circular(16),
-                                bottomLeft: Radius.circular(
-                                    isMe ? 16 : 4),
-                                bottomRight: Radius.circular(
-                                    isMe ? 4 : 16),
+                                topLeft: const Radius.circular(16),
+                                topRight: const Radius.circular(16),
+                                bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                bottomRight: Radius.circular(isMe ? 4 : 16),
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color.fromRGBO(
-                                      0, 0, 0, 0.06),
+                                  color: const Color.fromRGBO(0, 0, 0, 0.06),
                                   blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
@@ -517,16 +507,13 @@ class _ChatPageState extends State<ChatPage> {
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Flexible(
                                   child: Text(
                                     data['text'] ?? '',
                                     style: TextStyle(
-                                      color: isMe
-                                          ? _white
-                                          : _black,
+                                      color: isMe ? _white : _black,
                                       fontSize: 14,
                                     ),
                                   ),
@@ -559,7 +546,6 @@ class _ChatPageState extends State<ChatPage> {
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                   child: Row(
                     children: [
-                      // Definir valor — bloqueado se já definiu
                       if (valorServico == null)
                         Expanded(
                           child: OutlinedButton.icon(
@@ -576,20 +562,22 @@ class _ChatPageState extends State<ChatPage> {
                         ),
                       if (valorServico != null) ...[
                         const SizedBox(width: 8),
-                        // Finalizar
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _finalizando
                                 ? null
-                                : () => _finalizarServico(pedidoId, valorServico),
+                                : () => _finalizarServico(
+                                    pedidoId, valorServico),
                             icon: _finalizando
                                 ? const SizedBox(
                                     width: 14,
                                     height: 14,
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2, color: _white))
-                                : const Icon(Icons.check_circle_outline, size: 16),
-                            label: Text(_finalizando ? 'Aguarde...' : 'Finalizar'),
+                                : const Icon(Icons.check_circle_outline,
+                                    size: 16),
+                            label: Text(
+                                _finalizando ? 'Aguarde...' : 'Finalizar'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _green,
                               foregroundColor: _white,
@@ -608,7 +596,12 @@ class _ChatPageState extends State<ChatPage> {
               if (!isConcluido)
                 Container(
                   color: _white,
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    8,
+                    12,
+                    bottomInset > 0 ? 8 : bottomPad + 8,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -619,23 +612,19 @@ class _ChatPageState extends State<ChatPage> {
                                 .collection('chats')
                                 .doc(widget.chatId)
                                 .set({
-                              'typing': text.isNotEmpty
-                                  ? user?.uid
-                                  : null,
+                              'typing': text.isNotEmpty ? user?.uid : null,
                             }, SetOptions(merge: true));
                           },
                           decoration: InputDecoration(
                             hintText: 'Digite uma mensagem...',
-                            hintStyle: const TextStyle(
-                                color: _textSecondary),
+                            hintStyle:
+                                const TextStyle(color: _textSecondary),
                             filled: true,
                             fillColor: _surface,
-                            contentPadding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 10),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
                             border: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide.none,
                             ),
                           ),
