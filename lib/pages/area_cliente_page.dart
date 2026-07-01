@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:url_launcher/url_launcher.dart';
 import '../main.dart'; // ✅ AuthCheck para logout correto
 import 'novo_pedido_page.dart';
 import 'meus_pedidos_page.dart';
 import 'perfil_page.dart';
 import 'map_page.dart';
+import 'chat_page.dart';
 
 class AreaClientePage extends StatefulWidget {
   const AreaClientePage({super.key});
@@ -108,6 +108,31 @@ class _AreaClientePageState extends State<AreaClientePage> {
         _loadingNome = false;
       });
     }
+  }
+
+  // ─── Abrir chat de suporte com o admin ──────────────────────────────────────
+  Future<void> _abrirSuporte() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final chatId = 'suporte_${user.uid}';
+
+    await FirebaseFirestore.instance
+        .collection('suporte_chats')
+        .doc(user.uid)
+        .set({
+      'userId': user.uid,
+      'nome': _nomeUsuario.isNotEmpty ? _nomeUsuario : (user.email ?? 'Usuário'),
+      'tipo': 'cliente',
+      'chatId': chatId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)),
+    );
   }
 
   Future<void> _sair() async {
@@ -230,15 +255,9 @@ class _AreaClientePageState extends State<AreaClientePage> {
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.support_agent_outlined),
-            tooltip: 'Suporte',
-            onPressed: () async {
-              final uri = Uri.parse(
-                  'https://wa.me/5541996931512?text=Ol%C3%A1%2C+preciso+de+ajuda+com+o+ConectaPro');
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Ajuda',
+            onPressed: _abrirSuporte,
           ),
           IconButton(
             icon: const Icon(Icons.receipt_long_outlined),
@@ -538,7 +557,6 @@ class _AreaClientePageState extends State<AreaClientePage> {
               final fotoUrl       = data['fotoUrl'] as String? ?? data['photoUrl'] as String? ?? '';
               final fotoBase64    = data['fotoBase64'] as String? ?? '';
 
-              // Resolve imagem: base64 tem prioridade, depois URL
               ImageProvider? imagemFoto;
               if (fotoBase64.isNotEmpty) {
                 try {

@@ -15,3 +15,7 @@
 
 # App classes
 -keep class com.conectapro.app.** { *; }
+
+# Play Core (deferred components não usados neste app — evita erro R8)
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }

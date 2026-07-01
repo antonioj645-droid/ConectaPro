@@ -26,8 +26,7 @@ const String _playStoreUrl =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const MyApp());
-
+  // ✅ CORRIGIDO: Firebase inicializado ANTES do runApp
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -37,6 +36,8 @@ Future<void> main() async {
   if (!kIsWeb) {
     await setupNotifications();
   }
+
+  runApp(const MyApp());
 }
 
 Future<void> setupNotifications() async {
@@ -118,7 +119,6 @@ Future<void> verificarAtualizacao(BuildContext context) async {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
-              // ✅ Abre a Play Store — sem download de APK externo
               onPressed: () async {
                 final uri = Uri.parse(_playStoreUrl);
                 if (await canLaunchUrl(uri)) {

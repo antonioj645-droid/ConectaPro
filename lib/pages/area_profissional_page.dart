@@ -50,6 +50,40 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     } catch (_) {}
   }
 
+  // ─── Abrir chat de suporte com o admin ──────────────────────────────────────
+  Future<void> _abrirSuporte() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final chatId = 'suporte_${user.uid}';
+
+    final docUser = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    final nome = docUser.data()?['nome'] ??
+        docUser.data()?['name'] ??
+        user.email ??
+        'Usuário';
+
+    await FirebaseFirestore.instance
+        .collection('suporte_chats')
+        .doc(user.uid)
+        .set({
+      'userId': user.uid,
+      'nome': nome,
+      'tipo': 'profissional',
+      'chatId': chatId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)),
+    );
+  }
+
   // ─── Desbloquear pedido ────────────────────────────────────────────────────
   Future<void> _desbloquearPedido(String pedidoId, String? chatId) async {
     if (_processandoPedidos.contains(pedidoId)) return;
@@ -199,6 +233,11 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             context: context,
             builder: (_) => const PixDialog(),
           ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.help_outline),
+          tooltip: 'Ajuda',
+          onPressed: _abrirSuporte,
         ),
         IconButton(
           icon: const Icon(Icons.logout),

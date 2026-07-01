@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import 'chat_page.dart';
+
 // ───────── MODELS ─────────
 
 class AppUser {
@@ -79,6 +81,7 @@ class _AdminPageState extends State<AdminPage> {
     ProfissionaisTab(),
     PedidosTab(),
     FinanceiroTab(),
+    SuporteTab(),
   ];
 
   @override
@@ -128,6 +131,7 @@ class _AdminPageState extends State<AdminPage> {
           NavigationDestination(icon: Icon(Icons.build_outlined), selectedIcon: Icon(Icons.build, color: _accent), label: 'Profissionais'),
           NavigationDestination(icon: Icon(Icons.receipt_outlined), selectedIcon: Icon(Icons.receipt, color: _accent), label: 'Pedidos'),
           NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet, color: _accent), label: 'Financeiro'),
+          NavigationDestination(icon: Icon(Icons.support_agent_outlined), selectedIcon: Icon(Icons.support_agent, color: _accent), label: 'Suporte'),
         ],
       ),
     );
@@ -166,7 +170,6 @@ class DashboardTab extends StatelessWidget {
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
               children: [
-                // ── Header com gradiente ──
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -231,12 +234,10 @@ class DashboardTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // ── Título seção ──
                 const Text('Métricas',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _black)),
                 const SizedBox(height: 12),
 
-                // ── Cards métricas ──
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
@@ -255,7 +256,6 @@ class DashboardTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // ── Gráfico ──
                 if (pagamentos.isNotEmpty) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -649,6 +649,95 @@ class FinanceiroTab extends StatelessWidget {
               ),
             );
           }).toList(),
+        );
+      },
+    );
+  }
+}
+
+// ───────── SUPORTE ─────────
+
+class SuporteTab extends StatelessWidget {
+  const SuporteTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('suporte_chats')
+          .orderBy('updatedAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(color: _accent));
+        }
+        final docs = snapshot.data!.docs;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('${docs.length} conversas de suporte',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _grey, letterSpacing: 0.8)),
+            ),
+            Expanded(
+              child: docs.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.support_agent_outlined, size: 48, color: _grey),
+                          SizedBox(height: 8),
+                          Text('Nenhuma conversa ainda', style: TextStyle(color: _grey)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: docs.length,
+                      itemBuilder: (context, i) {
+                        final data    = docs[i].data() as Map<String, dynamic>;
+                        final nome    = data['nome'] ?? 'Usuário';
+                        final tipo    = data['tipo'] ?? 'cliente';
+                        final chatId  = data['chatId'] ?? '';
+                        final isPro   = tipo == 'profissional';
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _card,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.05), blurRadius: 8, offset: const Offset(0,3))],
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            leading: CircleAvatar(
+                              backgroundColor: isPro
+                                  ? const Color.fromRGBO(52,199,89,0.15)
+                                  : const Color.fromRGBO(39,110,241,0.12),
+                              child: Icon(isPro ? Icons.build : Icons.person,
+                                  color: isPro ? _green : _accent, size: 18),
+                            ),
+                            title: Text(nome,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _black)),
+                            subtitle: Text(isPro ? 'Profissional' : 'Cliente',
+                                style: const TextStyle(fontSize: 12, color: _grey)),
+                            trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: _grey),
+                            onTap: () {
+                              if (chatId.toString().isEmpty) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatPage(chatId: chatId.toString()),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
     );
