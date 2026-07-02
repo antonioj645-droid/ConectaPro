@@ -165,7 +165,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
 
       try {
         await http.post(
-          Uri.parse('https://conectapro-backend-y7oe.onrender.com/pedidos/novo-pedido'),
+          Uri.parse('https://conectapro-backend-1.onrender.com/pedidos/novo-pedido'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'pedidoId':     docRef.id,

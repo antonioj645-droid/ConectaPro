@@ -10,6 +10,7 @@ import 'chat_page.dart';
 import 'pix_dialog.dart';
 import 'meus_servicos_page.dart';
 import 'historico_servicos_page.dart';
+import 'meu_perfil_profissional_page.dart';
 
 class AreaProfissionalPage extends StatefulWidget {
   AreaProfissionalPage({Key? key}) : super(key: key);
@@ -235,6 +236,14 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           ),
         ),
         IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'Meu perfil',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MeuPerfilProfissionalPage()),
+          ),
+        ),
+        IconButton(
           icon: const Icon(Icons.help_outline),
           tooltip: 'Ajuda',
           onPressed: _abrirSuporte,
@@ -315,8 +324,8 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('requests')
-          .where('status', isEqualTo: 'pendente')
-          .orderBy('createdAt', descending: true)
+          .where('status', isEqualTo: 'aberto')
+          .orderBy('criadoEm', descending: true)
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {

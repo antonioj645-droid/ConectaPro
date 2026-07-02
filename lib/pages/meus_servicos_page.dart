@@ -3,6 +3,70 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'chat_page.dart';
 
+Future<void> _cancelarServicoProfissional(
+    BuildContext context, String pedidoId) async {
+  final confirmar = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'Cancelar serviço',
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        textAlign: TextAlign.center,
+      ),
+      content: const Text(
+        'Não foi possível fechar esse serviço com o cliente?\nO pedido voltará para a lista de pedidos disponíveis para outros profissionais.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Voltar',
+              style: TextStyle(color: Color(0xFF757575))),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFF3B30),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: 0,
+          ),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Cancelar serviço',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmar != true) return;
+
+  try {
+    await FirebaseFirestore.instance.collection('requests').doc(pedidoId).update({
+      'status': 'aberto',
+      'providerId': '',
+      'acceptedAt': FieldValue.delete(),
+      'canceladoPeloProfissionalEm': FieldValue.serverTimestamp(),
+    });
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Serviço cancelado e liberado para outros profissionais.'),
+          backgroundColor: Color(0xFFFF3B30),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao cancelar: $e')),
+      );
+    }
+  }
+}
+
 class MeusServicosPage extends StatelessWidget {
   const MeusServicosPage({super.key});
 
@@ -100,7 +164,10 @@ class MeusServicosPage extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
                     children: [
                       // Ícone
                       Container(
@@ -181,6 +248,30 @@ class MeusServicosPage extends StatelessWidget {
                       if (status == 'concluido')
                         const Icon(Icons.check_circle,
                             color: _green, size: 28),
+                    ],
+                      ),
+
+                      // Botão cancelar (só enquanto está em andamento,
+                      // nunca depois de concluído — protege o pagamento do profissional)
+                      if (status == 'aceito') ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 40,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFFF3B30),
+                              side: const BorderSide(color: Color(0xFFFF3B30)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.cancel_outlined, size: 16),
+                            label: const Text('Cancelar serviço',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
+                            onPressed: () =>
+                                _cancelarServicoProfissional(context, doc.id),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
