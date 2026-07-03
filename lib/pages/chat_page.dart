@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -70,14 +71,29 @@ class _ChatPageState extends State<ChatPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Definir valor do serviço',
             style: TextStyle(fontWeight: FontWeight.w700)),
-        content: TextField(
-          controller: _valorCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: 'Valor (R\$)',
-            prefixIcon: const Icon(Icons.attach_money),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _valorCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+              ],
+              decoration: InputDecoration(
+                labelText: 'Valor (R\$)',
+                hintText: '1500,00',
+                prefixIcon: const Icon(Icons.attach_money),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Use vírgula pros centavos. Ex: 1500,00 = R\$ 1.500,00',
+              style: TextStyle(fontSize: 12, color: _textSecondary),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -93,7 +109,15 @@ class _ChatPageState extends State<ChatPage> {
             onPressed: () async {
               final valor = double.tryParse(
                   _valorCtrl.text.trim().replaceAll(',', '.'));
-              if (valor == null || valor <= 0) return;
+              if (valor == null || valor <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Digite um valor válido. Ex: 1500,00'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
 
               await FirebaseFirestore.instance
                   .collection('requests')

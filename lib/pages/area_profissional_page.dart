@@ -537,7 +537,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                               size: 18, color: _white),
                           SizedBox(width: 8),
                           Text(
-                            'Aceitar pedido (R\$ 3,00)',
+                            'Aceitar pedido (R\$ 1,00)',
                             style: TextStyle(
                                 color: _white,
                                 fontSize: 14,
