@@ -105,7 +105,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
       final saldo = ((docUser.data()?['balance'] ?? 0) as num).toDouble();
 
       // Saldo insuficiente → abre PIX para adicionar saldo
-      if (saldo < 3) {
+      if (saldo < 1) {
         setState(() => _processandoPedidos.remove(pedidoId));
         if (!mounted) return;
         showDialog(
@@ -290,7 +290,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                     fontWeight: FontWeight.w600),
               ),
               const Spacer(),
-              if (saldo < 3)
+              if (saldo < 1)
                 GestureDetector(
                   onTap: () => showDialog(
                     context: context,

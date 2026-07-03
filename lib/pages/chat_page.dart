@@ -22,6 +22,7 @@ class _ChatPageState extends State<ChatPage> {
 
   final TextEditingController _msgCtrl    = TextEditingController();
   final TextEditingController _valorCtrl  = TextEditingController();
+  final TextEditingController _codigoCtrl = TextEditingController();
   final ScrollController      _scrollCtrl = ScrollController();
 
   bool _enviando    = false;
@@ -124,6 +125,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _finalizarServico(String pedidoId, double valorServico) async {
     final comissao = valorServico * 0.07;
+    _codigoCtrl.clear();
 
     final confirmar = await showDialog<bool>(
       context: context,
@@ -147,6 +149,25 @@ class _ChatPageState extends State<ChatPage> {
               'Esse valor será descontado da sua carteira.',
               style: TextStyle(color: _textSecondary, fontSize: 13),
             ),
+            const SizedBox(height: 16),
+            const Text(
+              'Peça o código de confirmação pro cliente:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _codigoCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 6),
+              decoration: const InputDecoration(
+                counterText: '',
+                hintText: '0000',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -169,6 +190,18 @@ class _ChatPageState extends State<ChatPage> {
     );
 
     if (confirmar != true) return;
+
+    final codigo = _codigoCtrl.text.trim();
+    if (codigo.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Digite o código de 4 dígitos que o cliente te passou.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _finalizando = true);
 
     try {
@@ -180,6 +213,7 @@ class _ChatPageState extends State<ChatPage> {
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'codigo': codigo}),
       );
 
       final data = jsonDecode(response.body);
@@ -217,7 +251,9 @@ class _ChatPageState extends State<ChatPage> {
                 ? '💰 Saldo insuficiente! Adicione créditos na carteira.'
                 : e.toString().contains('Valor do serviço não definido')
                     ? '⚠️ Defina o valor do serviço antes de finalizar.'
-                    : 'Erro ao finalizar: $e',
+                    : e.toString().contains('Código de confirmação')
+                        ? '🔑 Código incorreto. Confirme com o cliente e tente de novo.'
+                        : 'Erro ao finalizar: $e',
           ),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 4),

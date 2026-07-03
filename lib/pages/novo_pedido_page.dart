@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 
 class NovoPedidoPage extends StatefulWidget {
   final String? categoriaInicial;
@@ -150,6 +151,11 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Usuário não autenticado');
 
+      // Código de confirmação (estilo iFood) — só o cliente vê,
+      // e só passa pro profissional quando o serviço estiver pronto.
+      final codigoConfirmacao =
+          (100 + Random().nextInt(900)).toString() + Random().nextInt(10).toString();
+
       final docRef = await FirebaseFirestore.instance.collection('requests').add({
         'clienteId':    user.uid,
         'titulo':       _tituloCtrl.text.trim(),
@@ -161,6 +167,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
         'chatId':       null,
         'valorServico': null,
         'comissaoPaga': false,
+        'codigoConfirmacao': codigoConfirmacao,
       });
 
       try {

@@ -103,70 +103,6 @@ class MeusPedidosPage extends StatelessWidget {
     }
   }
 
-  Future<void> _marcarConcluido(BuildContext context, String pedidoId) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Confirmar conclusão',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-        content: const Text(
-          'O serviço foi executado e você está satisfeito?\nIsso liberará o pagamento ao profissional.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Voltar',
-                style: TextStyle(color: Color(0xFF757575))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF34C759),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirmar',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar != true) return;
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('requests')
-          .doc(pedidoId)
-          .update({
-        'status': 'concluido',
-        'concluidoEm': FieldValue.serverTimestamp(),
-      });
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Serviço marcado como concluído! ✅'),
-            backgroundColor: Color(0xFF34C759),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
-        );
-      }
-    }
-  }
-
   void _abrirAvaliacao(BuildContext context, String pedidoId, String providerId) {
     int _estrelas = 0;
     final _comentarioCtrl = TextEditingController();
@@ -394,6 +330,7 @@ class MeusPedidosPage extends StatelessWidget {
                     final chatId     = data['chatId'] ?? pedidoId;
                     final categoria  = data['categoria'] ?? '';
                     final providerId = data['providerId'] ?? '';
+                    final codigoConfirmacao = data['codigoConfirmacao'] ?? '';
                     final avaliacao  = data['avaliacao'];
                     final valorServico = data['valorServico'];
 
@@ -679,25 +616,44 @@ class MeusPedidosPage extends StatelessWidget {
                                 // Botão concluir serviço
                                 if (status == 'aceito') ...[
                                   const SizedBox(height: 8),
-                                  SizedBox(
+                                  Container(
                                     width: double.infinity,
-                                    height: 44,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _green,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
-                                        elevation: 0,
-                                      ),
-                                      icon: const Icon(Icons.check_circle_outline,
-                                          size: 16, color: _white),
-                                      label: const Text('Serviço concluído',
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFF4D6),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: const Color(0xFFFFC93C)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        const Text(
+                                          'Código de confirmação',
                                           style: TextStyle(
-                                              color: _white,
-                                              fontWeight: FontWeight.w700)),
-                                      onPressed: () =>
-                                          _marcarConcluido(context, pedidoId),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF8A6D00)),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          codigoConfirmacao,
+                                          style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 4,
+                                              color: Color(0xFF5C4700)),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'Só passe esse código pro profissional quando o serviço estiver pronto e você satisfeito. É ele que libera o pagamento.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: Color(0xFF8A6D00)),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
