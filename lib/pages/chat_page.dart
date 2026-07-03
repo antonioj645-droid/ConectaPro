@@ -5,6 +5,38 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
+/// Máscara de moeda BR: usuário digita só números e o app monta
+/// "1.500,00" sozinho, sem risco de confundir milhar com decimal.
+class _MoedaBrFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+    // Interpreta os últimos 2 dígitos como centavos
+    final valorCentavos = int.parse(digits);
+    final reais = valorCentavos ~/ 100;
+    final centavos = valorCentavos % 100;
+
+    final reaisFormatado = reais.toString().replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.');
+
+    final texto = '$reaisFormatado,${centavos.toString().padLeft(2, '0')}';
+
+    return TextEditingValue(
+      text: texto,
+      selection: TextSelection.collapsed(offset: texto.length),
+    );
+  }
+
+  static double? paraDouble(String texto) {
+    final limpo = texto.replaceAll('.', '').replaceAll(',', '.');
+    return double.tryParse(limpo);
+  }
+}
+
 class ChatPage extends StatefulWidget {
   final String chatId;
   const ChatPage({super.key, required this.chatId});
@@ -59,38 +91,41 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Future<void> _definirValor(String pedidoId) async {
+  Future<void> _definirValor(String pedidoId, {double? valorAtual}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    _valorCtrl.clear();
+    final ehCorrecao = valorAtual != null;
+    _valorCtrl.text = ehCorrecao
+        ? valorAtual.toStringAsFixed(2).replaceAll('.', ',')
+        : '';
 
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Definir valor do serviço',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(
+            ehCorrecao ? 'Corrigir valor do serviço' : 'Definir valor do serviço',
+            style: const TextStyle(fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
               controller: _valorCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
-              ],
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [_MoedaBrFormatter()],
               decoration: InputDecoration(
                 labelText: 'Valor (R\$)',
-                hintText: '1500,00',
+                hintText: '1.500,00',
                 prefixIcon: const Icon(Icons.attach_money),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Use vírgula pros centavos. Ex: 1500,00 = R\$ 1.500,00',
+              'Digite só os números — o ponto e a vírgula aparecem sozinhos.',
               style: TextStyle(fontSize: 12, color: _textSecondary),
             ),
           ],
@@ -107,12 +142,11 @@ class _ChatPageState extends State<ChatPage> {
                   borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () async {
-              final valor = double.tryParse(
-                  _valorCtrl.text.trim().replaceAll(',', '.'));
+              final valor = _MoedaBrFormatter.paraDouble(_valorCtrl.text);
               if (valor == null || valor <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Digite um valor válido. Ex: 1500,00'),
+                    content: Text('Digite um valor válido.'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -129,18 +163,20 @@ class _ChatPageState extends State<ChatPage> {
                   .doc(widget.chatId)
                   .collection('messages')
                   .add({
-                'text':      'R\$ ${valor.toStringAsFixed(2)}',
+                'text':      ehCorrecao
+                    ? '✏️ Valor corrigido para R\$ ${valor.toStringAsFixed(2)}'
+                    : 'R\$ ${valor.toStringAsFixed(2)}',
                 'senderId':  user.uid,
                 'createdAt': FieldValue.serverTimestamp(),
                 'isRead':    false,
-                'tipo':      'valor_proposto',
+                'tipo':      ehCorrecao ? 'valor_corrigido' : 'valor_proposto',
                 'valor':     valor,
               });
 
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Enviar proposta',
-                style: TextStyle(color: _white)),
+            child: Text(ehCorrecao ? 'Salvar correção' : 'Enviar proposta',
+                style: const TextStyle(color: _white)),
           ),
         ],
       ),
@@ -375,13 +411,31 @@ class _ChatPageState extends State<ChatPage> {
                     children: [
                       const Icon(Icons.attach_money, color: _green, size: 20),
                       const SizedBox(width: 8),
-                      Text(
-                        'Valor do serviço: R\$ ${valorServico.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            color: _green,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14),
+                      Expanded(
+                        child: Text(
+                          'Valor do serviço: R\$ ${valorServico.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              color: _green,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14),
+                        ),
                       ),
+                      if (isProfissional && pedidoId != null)
+                        GestureDetector(
+                          onTap: () => _definirValor(pedidoId,
+                              valorAtual: valorServico),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.edit, size: 14, color: _green),
+                              SizedBox(width: 4),
+                              Text('Corrigir',
+                                  style: TextStyle(
+                                      color: _green,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12)),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
