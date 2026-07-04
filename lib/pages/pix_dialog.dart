@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class PixDialog extends StatefulWidget {
   final double? valor; // agora opcional
@@ -35,7 +36,7 @@ class _PixDialogState extends State<PixDialog> {
   double?                  _valorEscolhido;
   final TextEditingController _controller = TextEditingController();
 
-  final String _baseUrl = "https://conectapro-backend-y7oe.onrender.com/pix";
+  final String _baseUrl = "https://conectapro-backend-1.onrender.com/pix";
 
   @override
   void initState() {
@@ -67,18 +68,30 @@ class _PixDialogState extends State<PixDialog> {
   }
 
   Future<void> _gerarPix() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() { _erro = true; _loading = false; });
+      return;
+    }
+
     try {
       final res = await http.post(
         Uri.parse('$_baseUrl/criar-pix'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'valor': _valorEscolhido,
-          'email': 'cliente@gmail.com',
-          'nome': 'Antonio',
+          'email': user.email ?? '${user.uid}@conectapro.app',
+          'nome': user.displayName ?? 'Usuário ConectaPro',
+          'userId': user.uid,
         }),
       );
 
       final data = jsonDecode(res.body);
+
+      if (data['success'] != true) {
+        if (mounted) setState(() { _erro = true; _loading = false; });
+        return;
+      }
 
       if (!mounted) return;
       setState(() {
