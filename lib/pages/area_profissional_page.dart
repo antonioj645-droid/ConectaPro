@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'chat_page.dart';
 import 'pix_dialog.dart';
+import '../main.dart';
 import 'meus_servicos_page.dart';
 import 'historico_servicos_page.dart';
 import 'meu_perfil_profissional_page.dart';
@@ -254,7 +255,10 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           onPressed: () async {
             await FirebaseAuth.instance.signOut();
             if (!mounted) return;
-            Navigator.pop(context);
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const AuthCheck()),
+              (route) => false,
+            );
           },
         ),
       ],

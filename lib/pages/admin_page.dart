@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'chat_page.dart';
+import '../main.dart';
 
 // ───────── MODELS ─────────
 
@@ -114,7 +115,10 @@ class _AdminPageState extends State<AdminPage> {
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
               if (!mounted) return;
-              Navigator.pop(context);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const AuthCheck()),
+                (route) => false,
+              );
             },
           ),
         ],
