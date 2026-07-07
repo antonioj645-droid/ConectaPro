@@ -193,7 +193,7 @@ class _PixDialogState extends State<PixDialog> {
                 fontSize: 22,
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        const Text('Mínimo R\$ 10,00',
+        const Text('Mínimo R\$ 5,00',
             style: TextStyle(color: Colors.white54, fontSize: 13)),
         const SizedBox(height: 24),
 
@@ -202,7 +202,7 @@ class _PixDialogState extends State<PixDialog> {
           spacing: 10,
           runSpacing: 10,
           alignment: WrapAlignment.center,
-          children: [10, 20, 50, 100].map((v) {
+          children: [5, 10, 20, 50, 100].map((v) {
             final selecionado = _valorEscolhido == v.toDouble();
             return GestureDetector(
               onTap: () {
@@ -282,7 +282,7 @@ class _PixDialogState extends State<PixDialog> {
                   borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            onPressed: (_valorEscolhido == null || _valorEscolhido! < 10)
+            onPressed: (_valorEscolhido == null || _valorEscolhido! < 5)
                 ? null
                 : () {
                     setState(() => _escolhendo = false);

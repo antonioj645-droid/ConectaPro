@@ -29,6 +29,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
   static const _textSecondary = Color(0xFF757575);
 
   final Set<String> _processandoPedidos = {};
+  final Set<String> _visualizados = {};
 
   @override
   void initState() {
@@ -49,6 +50,18 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           .collection('users')
           .doc(user.uid)
           .update({'latitude': pos.latitude, 'longitude': pos.longitude});
+    } catch (_) {}
+  }
+
+  // ─── Registrar visualização do pedido (para contagem de interessados) ──────
+  Future<void> _registrarVisualizacao(String pedidoId) async {
+    if (_visualizados.contains(pedidoId)) return;
+    _visualizados.add(pedidoId);
+    try {
+      await FirebaseFirestore.instance
+          .collection('requests')
+          .doc(pedidoId)
+          .update({'visualizacoes': FieldValue.increment(1)});
     } catch (_) {}
   }
 
@@ -389,6 +402,8 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             itemBuilder: (context, index) {
               final doc  = pedidos[index];
               final data = doc.data() as Map<String, dynamic>;
+              // Registra visualização assim que o card é renderizado na lista
+              _registrarVisualizacao(doc.id);
               return _buildCardPedido(
                   doc.id, data, temServicoAtivo);
             },
@@ -396,6 +411,17 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         );
       },
     );
+  }
+
+  // ─── Formata "há X min / X h / X d" a partir do Timestamp ──────────────────
+  String _tempoDecorrido(dynamic criadoEm) {
+    if (criadoEm == null || criadoEm is! Timestamp) return '';
+    final dt = criadoEm.toDate();
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'agora mesmo';
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    return 'há ${diff.inDays}d';
   }
 
   // ─── Card de pedido ────────────────────────────────────────────────────────
@@ -407,6 +433,14 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     final bairro    = data['bairro'] ?? data['neighborhood'] ?? '';
     final chatId    = data['chatId'] as String?;
     final isProcessando = _processandoPedidos.contains(pedidoId);
+
+    final tempo = _tempoDecorrido(data['criadoEm']);
+
+    final valorMin = data['valorEstimadoMin'];
+    final valorMax = data['valorEstimadoMax'];
+    final temValorEstimado = valorMin != null && valorMax != null;
+
+    final visualizacoes = ((data['visualizacoes'] ?? 0) as num).toInt();
 
     return Container(
       decoration: BoxDecoration(
@@ -461,20 +495,35 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                     ],
                   ),
                 ),
-                if (bairro.isNotEmpty)
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 13, color: _textSecondary),
-                      const SizedBox(width: 2),
-                      Text(bairro,
-                          style: const TextStyle(
-                              fontSize: 12, color: _textSecondary)),
-                    ],
-                  ),
               ],
             ),
           ),
+
+          // Linha: bairro + tempo decorrido
+          if (bairro.isNotEmpty || tempo.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  if (bairro.isNotEmpty) ...[
+                    const Icon(Icons.location_on_outlined,
+                        size: 13, color: _textSecondary),
+                    const SizedBox(width: 2),
+                    Text(bairro,
+                        style: const TextStyle(
+                            fontSize: 12, color: _textSecondary)),
+                  ],
+                  if (bairro.isNotEmpty && tempo.isNotEmpty)
+                    const Text('  ·  ',
+                        style: TextStyle(
+                            fontSize: 12, color: _textSecondary)),
+                  if (tempo.isNotEmpty)
+                    Text(tempo,
+                        style: const TextStyle(
+                            fontSize: 12, color: _textSecondary)),
+                ],
+              ),
+            ),
 
           const Divider(color: Color(0xFFE5E5E5), height: 1, indent: 16, endIndent: 16),
 
@@ -487,6 +536,33 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                     fontSize: 13.5, color: _textSecondary, height: 1.45),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+          // Linha: valor estimado + visualizações
+          if (temValorEstimado || visualizacoes > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (temValorEstimado)
+                    Text(
+                      '💰 R\$ ${(valorMin as num).toStringAsFixed(0)}-${(valorMax as num).toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: _black),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  if (visualizacoes > 0)
+                    Text(
+                      '👀 $visualizacoes profissional${visualizacoes > 1 ? 'is' : ''} ${visualizacoes > 1 ? 'já viram' : 'já viu'}',
+                      style: const TextStyle(
+                          fontSize: 11.5, color: _textSecondary),
+                    ),
+                ],
               ),
             ),
 
@@ -541,7 +617,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                               size: 18, color: _white),
                           SizedBox(width: 8),
                           Text(
-                            'Aceitar pedido (R\$ 1,00)',
+                            'Desbloquear contato (R\$ 1,00)',
                             style: TextStyle(
                                 color: _white,
                                 fontSize: 14,
