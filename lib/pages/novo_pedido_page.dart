@@ -32,6 +32,8 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
 
   bool _carregando = false;
   bool _buscandoCep = false;
+  double? _latitude;
+  double? _longitude;
   String? _categoriaSelecionada;
   String? _subcategoriaSelecionada;
 
@@ -179,6 +181,10 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
           _cidadeCtrl.text = data['localidade'] ?? '';
           _estadoCtrl.text = data['uf'] ?? '';
         });
+
+        // Geocodifica o endereço completo para obter latitude/longitude,
+        // usado depois para calcular a distância até o profissional.
+        await _geocodificarEndereco();
       } else {
         throw Exception('Erro ao consultar CEP');
       }
@@ -191,6 +197,46 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       );
     } finally {
       if (mounted) setState(() => _buscandoCep = false);
+    }
+  }
+
+  // ─── Geocodifica o endereço (rua, bairro, cidade, UF) em lat/long ──────────
+  // Usa a API pública do OpenStreetMap (Nominatim), sem necessidade de chave.
+  Future<void> _geocodificarEndereco() async {
+    final partes = [
+      _ruaCtrl.text.trim(),
+      _bairroCtrl.text.trim(),
+      _cidadeCtrl.text.trim(),
+      _estadoCtrl.text.trim(),
+      'Brasil',
+    ].where((p) => p.isNotEmpty).join(', ');
+
+    if (partes.isEmpty) return;
+
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+        'q': partes,
+        'format': 'json',
+        'limit': '1',
+      });
+
+      final response = await http.get(
+        uri,
+        headers: {'User-Agent': 'ConectaProApp/1.0'},
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final results = jsonDecode(response.body) as List;
+        if (results.isNotEmpty) {
+          setState(() {
+            _latitude  = double.tryParse(results[0]['lat'].toString());
+            _longitude = double.tryParse(results[0]['lon'].toString());
+          });
+        }
+      }
+    } catch (_) {
+      // Falha silenciosa: a distância simplesmente não aparecerá no card,
+      // mas o pedido continua sendo criado normalmente.
     }
   }
 
@@ -248,6 +294,8 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
         'estado':       _estadoCtrl.text.trim(),
         'valorEstimadoMin': valorMin,
         'valorEstimadoMax': valorMax,
+        'latitude':     _latitude,
+        'longitude':    _longitude,
         'visualizacoes': 0,
         'status':       'aberto',
         'criadoEm':     FieldValue.serverTimestamp(),

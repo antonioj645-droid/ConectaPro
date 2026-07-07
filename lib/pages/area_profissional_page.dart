@@ -30,6 +30,8 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
 
   final Set<String> _processandoPedidos = {};
   final Set<String> _visualizados = {};
+  double? _minhaLat;
+  double? _minhaLng;
 
   @override
   void initState() {
@@ -46,6 +48,12 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) return;
       final pos = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _minhaLat = pos.latitude;
+          _minhaLng = pos.longitude;
+        });
+      }
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -575,6 +583,23 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     return 'há ${diff.inDays}d';
   }
 
+  // ─── Calcula distância (em km) entre o profissional e o pedido ────────────
+  String? _formatarDistancia(Map<String, dynamic> data) {
+    if (_minhaLat == null || _minhaLng == null) return null;
+    final lat = data['latitude'];
+    final lng = data['longitude'];
+    if (lat == null || lng == null) return null;
+
+    final distanciaMetros = Geolocator.distanceBetween(
+      _minhaLat!,
+      _minhaLng!,
+      (lat as num).toDouble(),
+      (lng as num).toDouble(),
+    );
+    final km = distanciaMetros / 1000;
+    return '${km.toStringAsFixed(km < 10 ? 1 : 0).replaceAll('.', ',')} km';
+  }
+
   // ─── Card de pedido ────────────────────────────────────────────────────────
   Widget _buildCardPedido(
       String pedidoId, Map<String, dynamic> data, bool temServicoAtivo) {
@@ -593,6 +618,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     final isProcessando = _processandoPedidos.contains(pedidoId);
 
     final tempo = _tempoDecorrido(data['criadoEm']);
+    final distancia = _formatarDistancia(data);
 
     final valorMin = data['valorEstimadoMin'];
     final valorMax = data['valorEstimadoMax'];
@@ -660,7 +686,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           // Linha: localização (bairro, cidade/estado) + tempo decorrido
           if (localizacao.isNotEmpty || tempo.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, distancia != null ? 2 : 8),
               child: Row(
                 children: [
                   if (localizacao.isNotEmpty) ...[
@@ -683,6 +709,22 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                     Text(tempo,
                         style: const TextStyle(
                             fontSize: 12, color: _textSecondary)),
+                ],
+              ),
+            ),
+
+          // Linha: distância até o profissional
+          if (distancia != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.directions_car_filled_outlined,
+                      size: 13, color: _textSecondary),
+                  const SizedBox(width: 2),
+                  Text(distancia,
+                      style: const TextStyle(
+                          fontSize: 12, color: _textSecondary)),
                 ],
               ),
             ),
