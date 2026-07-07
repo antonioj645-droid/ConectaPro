@@ -686,7 +686,7 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           // Linha: localização (bairro, cidade/estado) + tempo decorrido
           if (localizacao.isNotEmpty || tempo.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, distancia != null ? 2 : 8),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, distancia != null ? 2 : 8),
               child: Row(
                 children: [
                   if (localizacao.isNotEmpty) ...[
