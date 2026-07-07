@@ -19,8 +19,12 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
   static const _white = Color(0xFFFFFFFF);
   static const _accent = Color(0xFF276EF1);
 
-  final _formKey    = GlobalKey<FormState>();
-  final _tituloCtrl = TextEditingController();
+  final _formKey       = GlobalKey<FormState>();
+  final _tituloCtrl    = TextEditingController();
+  final _descricaoCtrl = TextEditingController();
+  final _bairroCtrl    = TextEditingController();
+  final _valorMinCtrl  = TextEditingController();
+  final _valorMaxCtrl  = TextEditingController();
 
   bool _carregando = false;
   String? _categoriaSelecionada;
@@ -130,6 +134,10 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
   @override
   void dispose() {
     _tituloCtrl.dispose();
+    _descricaoCtrl.dispose();
+    _bairroCtrl.dispose();
+    _valorMinCtrl.dispose();
+    _valorMaxCtrl.dispose();
     super.dispose();
   }
 
@@ -146,6 +154,24 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       return;
     }
 
+    // Valida faixa de valor estimado, se preenchida
+    double? valorMin;
+    double? valorMax;
+    if (_valorMinCtrl.text.trim().isNotEmpty || _valorMaxCtrl.text.trim().isNotEmpty) {
+      valorMin = double.tryParse(_valorMinCtrl.text.trim().replaceAll(',', '.'));
+      valorMax = double.tryParse(_valorMaxCtrl.text.trim().replaceAll(',', '.'));
+      if (valorMin == null || valorMax == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Informe valores válidos para a faixa estimada')));
+        return;
+      }
+      if (valorMax < valorMin) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('O valor máximo deve ser maior ou igual ao mínimo')));
+        return;
+      }
+    }
+
     setState(() => _carregando = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -159,8 +185,13 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       final docRef = await FirebaseFirestore.instance.collection('requests').add({
         'clienteId':    user.uid,
         'titulo':       _tituloCtrl.text.trim(),
+        'descricao':    _descricaoCtrl.text.trim(),
         'categoria':    _categoriaSelecionada,
         'subcategoria': _subcategoriaSelecionada,
+        'bairro':       _bairroCtrl.text.trim(),
+        'valorEstimadoMin': valorMin,
+        'valorEstimadoMax': valorMax,
+        'visualizacoes': 0,
         'status':       'aberto',
         'criadoEm':     FieldValue.serverTimestamp(),
         'providerId':   null,
@@ -283,6 +314,29 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
     }
   }
 
+  InputDecoration _decoracaoPadrao({
+    required String label,
+    required String hint,
+    required IconData icone,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icone, color: const Color(0xFF757575)),
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _accent, width: 2)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -305,21 +359,73 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
               controller: _tituloCtrl,
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? 'Informe o título' : null,
-              decoration: InputDecoration(
-                labelText: 'Título do serviço',
-                hintText: 'Ex: Trocar tomada na sala',
-                prefixIcon: const Icon(Icons.title, color: Color(0xFF757575)),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _accent, width: 2)),
+              decoration: _decoracaoPadrao(
+                label: 'Título do serviço',
+                hint: 'Ex: Trocar tomada na sala',
+                icone: Icons.title,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // DESCRIÇÃO
+            TextFormField(
+              controller: _descricaoCtrl,
+              maxLines: 3,
+              decoration: _decoracaoPadrao(
+                label: 'Descrição (opcional)',
+                hint: 'Detalhe o que precisa ser feito',
+                icone: Icons.notes,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // BAIRRO
+            TextFormField(
+              controller: _bairroCtrl,
+              decoration: _decoracaoPadrao(
+                label: 'Bairro',
+                hint: 'Ex: Centro',
+                icone: Icons.location_on_outlined,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // FAIXA DE VALOR ESTIMADO
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _valorMinCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _decoracaoPadrao(
+                      label: 'Valor mín. (R\$)',
+                      hint: 'Ex: 80',
+                      icone: Icons.attach_money,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _valorMaxCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _decoracaoPadrao(
+                      label: 'Valor máx. (R\$)',
+                      hint: 'Ex: 150',
+                      icone: Icons.attach_money,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 6, left: 4),
+              child: Text(
+                'Opcional, mas ajuda o profissional a decidir se vale a pena.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF757575)),
               ),
             ),
 
