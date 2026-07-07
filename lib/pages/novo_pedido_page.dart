@@ -22,11 +22,15 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
   final _formKey       = GlobalKey<FormState>();
   final _tituloCtrl    = TextEditingController();
   final _descricaoCtrl = TextEditingController();
+  final _cepCtrl       = TextEditingController();
   final _bairroCtrl    = TextEditingController();
+  final _cidadeCtrl    = TextEditingController();
+  final _estadoCtrl    = TextEditingController();
   final _valorMinCtrl  = TextEditingController();
   final _valorMaxCtrl  = TextEditingController();
 
   bool _carregando = false;
+  bool _buscandoCep = false;
   String? _categoriaSelecionada;
   String? _subcategoriaSelecionada;
 
@@ -135,10 +139,56 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
   void dispose() {
     _tituloCtrl.dispose();
     _descricaoCtrl.dispose();
+    _cepCtrl.dispose();
     _bairroCtrl.dispose();
+    _cidadeCtrl.dispose();
+    _estadoCtrl.dispose();
     _valorMinCtrl.dispose();
     _valorMaxCtrl.dispose();
     super.dispose();
+  }
+
+  // ─── Busca endereço automaticamente a partir do CEP (API ViaCEP) ───────────
+  Future<void> _buscarCep() async {
+    final cep = _cepCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cep.length != 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CEP inválido. Digite os 8 números.')));
+      return;
+    }
+
+    setState(() => _buscandoCep = true);
+    try {
+      final response = await http
+          .get(Uri.parse('https://viacep.com.br/ws/$cep/json/'))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['erro'] == true) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('CEP não encontrado')));
+          return;
+        }
+        setState(() {
+          _bairroCtrl.text = data['bairro'] ?? '';
+          _cidadeCtrl.text = data['localidade'] ?? '';
+          _estadoCtrl.text = data['uf'] ?? '';
+        });
+      } else {
+        throw Exception('Erro ao consultar CEP');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível buscar o CEP. Preencha manualmente.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _buscandoCep = false);
+    }
   }
 
   Future<void> _enviar() async {
@@ -189,6 +239,9 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
         'categoria':    _categoriaSelecionada,
         'subcategoria': _subcategoriaSelecionada,
         'bairro':       _bairroCtrl.text.trim(),
+        'cep':          _cepCtrl.text.trim(),
+        'cidade':       _cidadeCtrl.text.trim(),
+        'estado':       _estadoCtrl.text.trim(),
         'valorEstimadoMin': valorMin,
         'valorEstimadoMax': valorMax,
         'visualizacoes': 0,
@@ -381,6 +434,56 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
 
             const SizedBox(height: 16),
 
+            // CEP
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _cepCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: _decoracaoPadrao(
+                      label: 'CEP',
+                      hint: 'Ex: 83000000',
+                      icone: Icons.markunread_mailbox_outlined,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _buscandoCep ? null : _buscarCep,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _black,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                    ),
+                    child: _buscandoCep
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                color: _white, strokeWidth: 2),
+                          )
+                        : const Text('Buscar',
+                            style: TextStyle(
+                                color: _white, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 6, left: 4),
+              child: Text(
+                'Preenche bairro, cidade e estado automaticamente.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF757575)),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             // BAIRRO
             TextFormField(
               controller: _bairroCtrl,
@@ -389,6 +492,39 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
                 hint: 'Ex: Centro',
                 icone: Icons.location_on_outlined,
               ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // CIDADE E ESTADO
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextFormField(
+                    controller: _cidadeCtrl,
+                    decoration: _decoracaoPadrao(
+                      label: 'Cidade',
+                      hint: 'Ex: Curitiba',
+                      icone: Icons.location_city_outlined,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: TextFormField(
+                    controller: _estadoCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    maxLength: 2,
+                    decoration: _decoracaoPadrao(
+                      label: 'UF',
+                      hint: 'PR',
+                      icone: Icons.flag_outlined,
+                    ).copyWith(counterText: ''),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 16),
