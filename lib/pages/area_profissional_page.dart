@@ -174,10 +174,12 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           clienteData = clienteDoc.data() ?? {};
         }
 
+        final ruaPedido    = pedidoData['rua'] ?? '';
         final bairroPedido = pedidoData['bairro'] ?? pedidoData['neighborhood'] ?? '';
         final cidadePedido = pedidoData['cidade'] ?? '';
         final estadoPedido = pedidoData['estado'] ?? '';
         final localizacaoPedido = [
+          if (ruaPedido.toString().isNotEmpty) ruaPedido,
           if (bairroPedido.toString().isNotEmpty) bairroPedido,
           if (cidadePedido.toString().isNotEmpty)
             estadoPedido.toString().isNotEmpty

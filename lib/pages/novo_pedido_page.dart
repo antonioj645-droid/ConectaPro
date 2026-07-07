@@ -23,6 +23,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
   final _tituloCtrl    = TextEditingController();
   final _descricaoCtrl = TextEditingController();
   final _cepCtrl       = TextEditingController();
+  final _ruaCtrl       = TextEditingController();
   final _bairroCtrl    = TextEditingController();
   final _cidadeCtrl    = TextEditingController();
   final _estadoCtrl    = TextEditingController();
@@ -140,6 +141,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
     _tituloCtrl.dispose();
     _descricaoCtrl.dispose();
     _cepCtrl.dispose();
+    _ruaCtrl.dispose();
     _bairroCtrl.dispose();
     _cidadeCtrl.dispose();
     _estadoCtrl.dispose();
@@ -172,6 +174,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
           return;
         }
         setState(() {
+          _ruaCtrl.text    = data['logradouro'] ?? '';
           _bairroCtrl.text = data['bairro'] ?? '';
           _cidadeCtrl.text = data['localidade'] ?? '';
           _estadoCtrl.text = data['uf'] ?? '';
@@ -239,6 +242,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
         'categoria':    _categoriaSelecionada,
         'subcategoria': _subcategoriaSelecionada,
         'bairro':       _bairroCtrl.text.trim(),
+        'rua':          _ruaCtrl.text.trim(),
         'cep':          _cepCtrl.text.trim(),
         'cidade':       _cidadeCtrl.text.trim(),
         'estado':       _estadoCtrl.text.trim(),
@@ -477,8 +481,20 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
             const Padding(
               padding: EdgeInsets.only(top: 6, left: 4),
               child: Text(
-                'Preenche bairro, cidade e estado automaticamente.',
+                'Preenche rua, bairro, cidade e estado automaticamente.',
                 style: TextStyle(fontSize: 12, color: Color(0xFF757575)),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // RUA
+            TextFormField(
+              controller: _ruaCtrl,
+              decoration: _decoracaoPadrao(
+                label: 'Rua',
+                hint: 'Ex: Rua das Flores',
+                icone: Icons.signpost_outlined,
               ),
             ),
 
