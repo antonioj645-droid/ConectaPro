@@ -157,6 +157,31 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         final chatFinal =
             (chatId != null && chatId.isNotEmpty) ? chatId : pedidoId;
 
+        // Busca dados do pedido + cliente para exibir na tela de contato
+        final pedidoDoc = await FirebaseFirestore.instance
+            .collection('requests')
+            .doc(pedidoId)
+            .get();
+        final pedidoData = pedidoDoc.data() ?? {};
+        final clienteId = pedidoData['clienteId'] as String?;
+
+        Map<String, dynamic> clienteData = {};
+        if (clienteId != null && clienteId.isNotEmpty) {
+          final clienteDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(clienteId)
+              .get();
+          clienteData = clienteDoc.data() ?? {};
+        }
+
+        if (!mounted) return;
+        await _mostrarDialogContato(
+          nome: clienteData['nome'] ?? 'Cliente',
+          telefone: clienteData['phone'] ?? clienteData['telefone'] ?? '',
+          bairro: pedidoData['bairro'] ?? pedidoData['neighborhood'] ?? '',
+          descricao: pedidoData['descricao'] ?? pedidoData['description'] ?? '',
+        );
+
         if (!mounted) return;
         Navigator.push(
           context,
@@ -177,6 +202,119 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     } finally {
       if (mounted) setState(() => _processandoPedidos.remove(pedidoId));
     }
+  }
+
+  // ─── Dialog de contato do cliente (exibido após desbloquear) ───────────────
+  Future<void> _mostrarDialogContato({
+    required String nome,
+    required String telefone,
+    required String bairro,
+    required String descricao,
+  }) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(52, 199, 89, 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.check_circle,
+                        color: Color(0xFF34C759), size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Contato desbloqueado!',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: _black),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text('Cliente',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: _textSecondary,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(nome,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _black)),
+              const SizedBox(height: 14),
+              if (telefone.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Icon(Icons.phone, size: 16, color: _accent),
+                    const SizedBox(width: 8),
+                    SelectableText(telefone,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (bairro.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined,
+                        size: 16, color: _accent),
+                    const SizedBox(width: 8),
+                    Text(bairro, style: const TextStyle(fontSize: 14)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+              ],
+              if (descricao.isNotEmpty) ...[
+                const Text('Descrição',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: _textSecondary,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(descricao,
+                    style: const TextStyle(fontSize: 14, height: 1.4)),
+                const SizedBox(height: 20),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _black,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Ir para o chat',
+                      style: TextStyle(
+                          color: _white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ─── Build ─────────────────────────────────────────────────────────────────
@@ -558,9 +696,13 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
                     const SizedBox.shrink(),
                   if (visualizacoes > 0)
                     Text(
-                      '👀 $visualizacoes profissional${visualizacoes > 1 ? 'is' : ''} ${visualizacoes > 1 ? 'já viram' : 'já viu'}',
+                      visualizacoes > 1
+                          ? '🔥 $visualizacoes interessados'
+                          : '🔥 1 interessado',
                       style: const TextStyle(
-                          fontSize: 11.5, color: _textSecondary),
+                          fontSize: 11.5,
+                          color: Color(0xFFFF6B35),
+                          fontWeight: FontWeight.w600),
                     ),
                 ],
               ),
