@@ -174,11 +174,22 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           clienteData = clienteDoc.data() ?? {};
         }
 
+        final bairroPedido = pedidoData['bairro'] ?? pedidoData['neighborhood'] ?? '';
+        final cidadePedido = pedidoData['cidade'] ?? '';
+        final estadoPedido = pedidoData['estado'] ?? '';
+        final localizacaoPedido = [
+          if (bairroPedido.toString().isNotEmpty) bairroPedido,
+          if (cidadePedido.toString().isNotEmpty)
+            estadoPedido.toString().isNotEmpty
+                ? '$cidadePedido/$estadoPedido'
+                : cidadePedido,
+        ].join(', ');
+
         if (!mounted) return;
         await _mostrarDialogContato(
           nome: clienteData['nome'] ?? 'Cliente',
           telefone: clienteData['phone'] ?? clienteData['telefone'] ?? '',
-          bairro: pedidoData['bairro'] ?? pedidoData['neighborhood'] ?? '',
+          bairro: localizacaoPedido,
           descricao: pedidoData['descricao'] ?? pedidoData['description'] ?? '',
         );
 
@@ -569,6 +580,13 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
     final descricao = data['descricao'] ?? data['description'] ?? '';
     final categoria = data['categoria'] ?? data['category'] ?? '';
     final bairro    = data['bairro'] ?? data['neighborhood'] ?? '';
+    final cidade    = data['cidade'] ?? '';
+    final estado    = data['estado'] ?? '';
+    final localizacao = [
+      if (bairro.toString().isNotEmpty) bairro,
+      if (cidade.toString().isNotEmpty)
+        estado.toString().isNotEmpty ? '$cidade/$estado' : cidade,
+    ].join(', ');
     final chatId    = data['chatId'] as String?;
     final isProcessando = _processandoPedidos.contains(pedidoId);
 
@@ -637,21 +655,25 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
             ),
           ),
 
-          // Linha: bairro + tempo decorrido
-          if (bairro.isNotEmpty || tempo.isNotEmpty)
+          // Linha: localização (bairro, cidade/estado) + tempo decorrido
+          if (localizacao.isNotEmpty || tempo.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Row(
                 children: [
-                  if (bairro.isNotEmpty) ...[
+                  if (localizacao.isNotEmpty) ...[
                     const Icon(Icons.location_on_outlined,
                         size: 13, color: _textSecondary),
                     const SizedBox(width: 2),
-                    Text(bairro,
-                        style: const TextStyle(
-                            fontSize: 12, color: _textSecondary)),
+                    Expanded(
+                      child: Text(localizacao,
+                          style: const TextStyle(
+                              fontSize: 12, color: _textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ),
                   ],
-                  if (bairro.isNotEmpty && tempo.isNotEmpty)
+                  if (localizacao.isNotEmpty && tempo.isNotEmpty)
                     const Text('  ·  ',
                         style: TextStyle(
                             fontSize: 12, color: _textSecondary)),
