@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'excluir_conta_page.dart';
+import 'termos_de_uso_page.dart';
 
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
@@ -297,6 +298,48 @@ class _PerfilPageState extends State<PerfilPage> {
             ),
 
             const SizedBox(height: 48),
+            const Divider(color: Color(0xFFE0E0E0)),
+            const SizedBox(height: 24),
+
+            // ── SOBRE ────────────────────────────────────────────────────────
+            const Text(
+              'Sobre',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textSecondary,
+                letterSpacing: 0.5,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const TermosDeUsoPage()),
+                ),
+                icon: const Icon(Icons.description_outlined, color: _black),
+                label: const Text(
+                  'Termos de Uso e Privacidade',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _black),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFE0E0E0)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
             const Divider(color: Color(0xFFE0E0E0)),
             const SizedBox(height: 24),
 
