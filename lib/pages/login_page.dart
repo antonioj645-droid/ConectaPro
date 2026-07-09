@@ -1,8 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import 'register_page.dart';
 
@@ -16,10 +18,18 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage>
     with SingleTickerProviderStateMixin {
 
-  static const _black         = Color(0xFF000000);
+  // ─── Tema (visual QP Qonex — fundo escuro, neon azul) ───────────────────────
+  static const _bgTop         = Color(0xFF050914);
+  static const _bgBottom      = Color(0xFF0A1226);
+  static const _cardBg        = Color(0xFF0D1730);
+  static const _fieldBg       = Color(0xFF0F1B38);
   static const _white         = Color(0xFFFFFFFF);
-  static const _accent        = Color(0xFF276EF1);
-  static const _textSecondary = Color(0xFF757575);
+  static const _accent        = Color(0xFF2F6FED);
+  static const _accentLight   = Color(0xFF4FA1FF);
+  static const _textSecondary = Color(0xFF8892B0);
+  static const _borderGlow    = Color(0xFF2F6FED);
+
+  static const _chaveEmailSalvo = 'login_email_salvo';
 
   final _emailCtrl = TextEditingController();
   final _senhaCtrl = TextEditingController();
@@ -27,6 +37,7 @@ class _LoginPageState extends State<LoginPage>
   bool _loading         = false;
   bool _loadingGoogle   = false;
   bool _obscurePassword = true;
+  bool _lembrarMe       = false;
 
   late final AnimationController _animCtrl;
   late final Animation<double>   _fadeAnim;
@@ -45,6 +56,31 @@ class _LoginPageState extends State<LoginPage>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
     _animCtrl.forward();
+    _carregarEmailSalvo();
+  }
+
+  Future<void> _carregarEmailSalvo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final emailSalvo = prefs.getString(_chaveEmailSalvo);
+      if (emailSalvo != null && emailSalvo.isNotEmpty) {
+        setState(() {
+          _emailCtrl.text = emailSalvo;
+          _lembrarMe = true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _atualizarEmailSalvo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_lembrarMe) {
+        await prefs.setString(_chaveEmailSalvo, _emailCtrl.text.trim());
+      } else {
+        await prefs.remove(_chaveEmailSalvo);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -80,6 +116,7 @@ class _LoginPageState extends State<LoginPage>
         password: _senhaCtrl.text.trim(),
       );
       await _salvarFcmToken(credential.user!.uid);
+      await _atualizarEmailSalvo();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
@@ -146,27 +183,37 @@ class _LoginPageState extends State<LoginPage>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: _cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Recuperar senha',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+            style: TextStyle(fontWeight: FontWeight.w700, color: _white)),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(color: _white),
           decoration: InputDecoration(
             labelText: 'Digite seu email',
-            prefixIcon: const Icon(Icons.email_outlined),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12)),
+            labelStyle: const TextStyle(color: _textSecondary),
+            prefixIcon: const Icon(Icons.email_outlined, color: _accentLight),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF243259)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _accent, width: 2),
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar',
+                style: TextStyle(color: _textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _black,
+              backgroundColor: _accent,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
@@ -197,303 +244,443 @@ class _LoginPageState extends State<LoginPage>
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  InputDecoration _inputDec(String label, String hint, IconData icon) {
+  InputDecoration _inputDec(String hint, IconData icon) {
     return InputDecoration(
-      labelText: label,
       hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
-      prefixIcon: Icon(icon, color: _textSecondary),
+      hintStyle: const TextStyle(color: Color(0xFF64708F), fontSize: 14),
+      prefixIcon: Icon(icon, color: _accentLight, size: 20),
       filled: true,
-      fillColor: _white,
+      fillColor: _fieldBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: Color(0xFF243259)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+        borderSide: const BorderSide(color: Color(0xFF243259)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _accent, width: 2),
+        borderSide: const BorderSide(color: _accent, width: 1.5),
       ),
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
-  Widget _campoComSombra({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: const Color.fromRGBO(0, 0, 0, 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-
-  Widget _googleIcon() {
-    return SizedBox(
-      width: 24,
-      height: 24,
-      child: CustomPaint(painter: _GoogleGPainter()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF0F4FF), Color(0xFFF6F6F6)],
+      backgroundColor: _bgTop,
+      body: Stack(
+        children: [
+          // Fundo com gradiente + estrelas/constelação
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [_bgTop, _bgBottom],
+                ),
+              ),
+              child: CustomPaint(
+                painter: _ConstelacaoPainter(),
+                size: Size.infinite,
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
 
-                      // LOGO
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color.fromRGBO(39, 110, 241, 0.25),
-                              blurRadius: 30,
-                              spreadRadius: 2,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            height: 120,
-                          ),
-                        ),
-                      ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
 
-                      const SizedBox(height: 20),
-
-                      // TAGLINE
-                      const Text(
-                        'Conectando clientes aos\nmelhores profissionais.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: _textSecondary,
-                          fontSize: 15,
-                          height: 1.5,
-                        ),
-                      ),
-
-                      const SizedBox(height: 40),
-
-                      // CAMPO EMAIL
-                      _campoComSombra(
-                        child: TextField(
-                          controller: _emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: _inputDec(
-                            'Email', 'Digite seu email', Icons.email_outlined),
-                        ),
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      // CAMPO SENHA
-                      _campoComSombra(
-                        child: TextField(
-                          controller: _senhaCtrl,
-                          obscureText: _obscurePassword,
-                          decoration: _inputDec(
-                            'Senha', 'Digite sua senha', Icons.lock_outline,
-                          ).copyWith(
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: _textSecondary,
+                        // LOGO com glow azul
+                        Container(
+                          width: 110,
+                          height: 110,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: _accent.withOpacity(0.45),
+                                blurRadius: 40,
+                                spreadRadius: 4,
                               ),
-                              onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/images/logo_qp.jpeg',
+                              fit: BoxFit.cover,
                             ),
                           ),
                         ),
-                      ),
 
-                      const SizedBox(height: 6),
+                        const SizedBox(height: 18),
 
-                      // ESQUECI SENHA
-                      Center(
-                        child: TextButton(
-                          onPressed: _esqueciSenha,
-                          child: const Text(
-                            'Esqueci minha senha',
-                            style: TextStyle(
-                              color: _accent,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      // BOTÃO ENTRAR
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color.fromRGBO(0, 0, 0, 0.18),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 54,
-                          child: ElevatedButton(
-                            onPressed: _loading ? null : _entrar,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _black,
-                              foregroundColor: _white,
-                              disabledBackgroundColor: Colors.grey.shade400,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
-                              elevation: 0,
-                            ),
-                            child: _loading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                        color: _white, strokeWidth: 2),
-                                  )
-                                : const Text(
-                                    'Entrar',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5),
-                                  ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // DIVISOR OU
-                      Row(
-                        children: [
-                          const Expanded(
-                              child: Divider(color: Color(0xFFDDDDDD))),
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text('ou',
+                        // TÍTULO
+                        RichText(
+                          text: const TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'QP ',
                                 style: TextStyle(
-                                    color: _textSecondary, fontSize: 13)),
+                                    color: _accentLight,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1),
+                              ),
+                              TextSpan(
+                                text: 'QONEX',
+                                style: TextStyle(
+                                    color: _white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1),
+                              ),
+                            ],
                           ),
-                          const Expanded(
-                              child: Divider(color: Color(0xFFDDDDDD))),
-                        ],
-                      ),
+                        ),
 
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 6),
 
-                      // BOTÃO GOOGLE
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: OutlinedButton(
-                          onPressed: _loadingGoogle ? null : _entrarComGoogle,
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFDDDDDD)),
-                            backgroundColor: _white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                        const Text(
+                          'Conectando você aos profissionais certos.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _textSecondary,
+fontSize: 13.5,
                           ),
-                          child: _loadingGoogle
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _googleIcon(),
-                                    const SizedBox(width: 12),
-                                    const Text(
-                                      'Entrar com Google',
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // CARTÃO COM BORDA NEON
+                        Container(
+                          padding: const EdgeInsets.all(22),
+                          decoration: BoxDecoration(
+                            color: _cardBg.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                                color: _borderGlow.withOpacity(0.35), width: 1.2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _accent.withOpacity(0.10),
+                                blurRadius: 24,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+
+                              // CAMPO EMAIL
+                              TextField(
+                                controller: _emailCtrl,
+                                keyboardType: TextInputType.emailAddress,
+                                style: const TextStyle(color: _white),
+                                decoration:
+                                    _inputDec('E-mail', Icons.person_outline),
+                              ),
+
+                              const SizedBox(height: 14),
+
+                              // CAMPO SENHA
+                              TextField(
+                                controller: _senhaCtrl,
+                                obscureText: _obscurePassword,
+                                style: const TextStyle(color: _white),
+                                decoration: _inputDec(
+                                  'Senha', Icons.lock_outline,
+                                ).copyWith(
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      color: _textSecondary,
+                                      size: 20,
+                                    ),
+                                    onPressed: () => setState(() =>
+                                        _obscurePassword = !_obscurePassword),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              // LEMBRAR-ME + ESQUECI SENHA
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: Checkbox(
+                                          value: _lembrarMe,
+                                          onChanged: (v) => setState(
+                                              () => _lembrarMe = v ?? false),
+                                          activeColor: _accent,
+                                          checkColor: _white,
+                                          side: const BorderSide(
+                                              color: Color(0xFF3A4B7A)),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(4)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text('Lembrar-me',
+                                          style: TextStyle(
+                                              color: _textSecondary,
+                                              fontSize: 12.5)),
+                                    ],
+                                  ),
+                                  TextButton(
+                                    onPressed: _esqueciSenha,
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: const Size(0, 0),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text(
+                                      'Esqueceu sua senha?',
                                       style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF333333)),
+                                        color: _accentLight,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // BOTÃO ENTRAR (gradiente azul)
+                              Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                    colors: [_accent, _accentLight],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _accent.withOpacity(0.4),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6),
                                     ),
                                   ],
                                 ),
-                        ),
-                      ),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: _loading ? null : _entrar,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14)),
+                                      elevation: 0,
+                                    ),
+                                    child: _loading
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                                color: _white, strokeWidth: 2),
+                                          )
+                                        : const Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                'Entrar',
+                                                style: TextStyle(
+                                                    color: _white,
+                                                    fontSize: 16,
+                                                    fontWeight:
+                                                        FontWeight.w800,
+                                                    letterSpacing: 0.5),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Icon(Icons.arrow_forward_rounded,
+                                                  color: _white, size: 18),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ),
 
-                      const SizedBox(height: 20),
+                              const SizedBox(height: 18),
 
-                      // CRIAR CONTA
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('Não tem conta?',
-                              style: TextStyle(
-                                  color: _textSecondary, fontSize: 14)),
-                          TextButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const RegisterPage()),
-                            ),
-                            child: const Text(
-                              'Criar conta',
-                              style: TextStyle(
-                                  color: _black,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14),
-                            ),
+                              // DIVISOR "ou"
+                              Row(
+                                children: [
+                                  Expanded(
+                                      child: Divider(
+                                          color: _borderGlow.withOpacity(0.25))),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    child: Text('ou',
+                                        style: TextStyle(
+                                            color: _textSecondary,
+                                            fontSize: 12.5)),
+                                  ),
+                                  Expanded(
+                                      child: Divider(
+                                          color: _borderGlow.withOpacity(0.25))),
+                                ],
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // BOTÃO GOOGLE
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: OutlinedButton(
+                                  onPressed:
+                                      _loadingGoogle ? null : _entrarComGoogle,
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(
+                                        color: _borderGlow.withOpacity(0.3)),
+                                    backgroundColor: _fieldBg,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14)),
+                                  ),
+                                  child: _loadingGoogle
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                              color: _accentLight,
+                                              strokeWidth: 2),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            _googleIcon(),
+                                            const SizedBox(width: 12),
+                                            const Text(
+                                              'Continuar com Google',
+                                              style: TextStyle(
+                                                  fontSize: 14.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: _white),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+
+                        const SizedBox(height: 22),
+
+                        // CRIAR CONTA
+                        Column(
+                          children: [
+                            const Text('Ainda não tem uma conta?',
+                                style: TextStyle(
+                                    color: _textSecondary, fontSize: 13.5)),
+                            TextButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const RegisterPage()),
+                              ),
+                              child: const Text(
+                                'Criar conta',
+                                style: TextStyle(
+                                    color: _accentLight,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
+
+  Widget _googleIcon() {
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: CustomPaint(painter: _GoogleGPainter()),
+    );
+  }
+}
+
+// ── Fundo de "constelação" (pontos + linhas conectando) ──────────────────────
+class _ConstelacaoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = Random(42); // seed fixa: mesmo padrão sempre, sem "piscar"
+    final pontos = List.generate(55, (_) {
+      return Offset(
+        random.nextDouble() * size.width,
+        random.nextDouble() * size.height,
+      );
+    });
+
+    final paintPonto = Paint()
+      ..color = const Color(0xFF2F6FED).withOpacity(0.5)
+      ..style = PaintingStyle.fill;
+
+    final paintLinha = Paint()
+      ..color = const Color(0xFF2F6FED).withOpacity(0.10)
+      ..strokeWidth = 1;
+
+    // Linhas entre pontos próximos (efeito de constelação)
+    for (int i = 0; i < pontos.length; i++) {
+      for (int j = i + 1; j < pontos.length; j++) {
+        final dist = (pontos[i] - pontos[j]).distance;
+        if (dist < 110) {
+          canvas.drawLine(pontos[i], pontos[j], paintLinha);
+        }
+      }
+    }
+
+    // Pontos (estrelas)
+    for (final p in pontos) {
+      canvas.drawCircle(p, random.nextDouble() * 1.6 + 0.6, paintPonto);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }
 
 // ── Painter do "G" colorido do Google ────────────────────────────────────────
@@ -510,24 +697,17 @@ class _GoogleGPainter extends CustomPainter {
     final paintGrn  = Paint()..color = const Color(0xFF34A853)..style = PaintingStyle.fill;
     final paintWht  = Paint()..color = const Color(0xFFFFFFFF)..style = PaintingStyle.fill;
 
-    // Fundo branco circular
     canvas.drawCircle(Offset(cx, cy), r, paintWht);
 
     final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.85);
 
-    // Vermelho: topo-esquerda
     canvas.drawArc(rect, -2.6, 1.6, true, paintRed);
-    // Amarelo: baixo-esquerda
     canvas.drawArc(rect, 2.2, 1.1, true, paintYel);
-    // Verde: baixo-direita
     canvas.drawArc(rect, 3.3, 1.2, true, paintGrn);
-    // Azul: direita e topo-direita
     canvas.drawArc(rect, 4.5, 2.3, true, paintBlue);
 
-    // Buraco central branco
     canvas.drawCircle(Offset(cx, cy), r * 0.55, paintWht);
 
-    // Faixa horizontal azul do "G"
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(cx, cy - r * 0.18, r * 0.85, r * 0.36),
