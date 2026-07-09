@@ -8,14 +8,16 @@ import 'perfil_profissional_page.dart';
 class MeusPedidosPage extends StatelessWidget {
   const MeusPedidosPage({super.key});
 
-  static const _black         = Color(0xFF000000);
+  // ─── Tema (mesma paleta da área profissional) ───────────────────────────────
+  static const _black         = Color(0xFF0A0A12);
+  static const _navyDark      = Color(0xFF0A0A16);
   static const _white         = Color(0xFFFFFFFF);
-  static const _accent        = Color(0xFF276EF1);
-  static const _surface       = Color(0xFFF6F6F6);
-  static const _textSecondary = Color(0xFF757575);
-  static const _green         = Color(0xFF34C759);
-  static const _orange        = Color(0xFFFF9500);
-  static const _red           = Color(0xFFFF3B30);
+  static const _accent        = Color(0xFF2F6FED);
+  static const _surface       = Color(0xFFF3F4F8);
+  static const _textSecondary = Color(0xFF6B7280);
+  static const _green         = Color(0xFF16A34A);
+  static const _orange        = Color(0xFFEA580C);
+  static const _red           = Color(0xFFEF4444);
 
   Color _corStatus(String s) {
     switch (s) {
@@ -61,7 +63,7 @@ class MeusPedidosPage extends StatelessWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF3B30),
+              backgroundColor: const Color(0xFFEF4444),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               elevation: 0,
@@ -90,7 +92,7 @@ class MeusPedidosPage extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Pedido cancelado com sucesso.'),
-            backgroundColor: Color(0xFFFF3B30),
+            backgroundColor: Color(0xFFEF4444),
           ),
         );
       }
@@ -134,7 +136,7 @@ class MeusPedidosPage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Icon(
                         i < _estrelas ? Icons.star : Icons.star_border,
-                        color: const Color(0xFFFFCC00),
+                        color: const Color(0xFFFFC94D),
                         size: 36,
                       ),
                     ),
@@ -246,12 +248,12 @@ class MeusPedidosPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: _surface,
       appBar: AppBar(
-        backgroundColor: _black,
+        backgroundColor: _navyDark,
         foregroundColor: _white,
         elevation: 0,
         title: const Text(
           'Meus Pedidos',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
         ),
       ),
       body: user == null
@@ -296,20 +298,28 @@ class MeusPedidosPage extends StatelessWidget {
                 });
 
                 if (docs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.inbox_outlined,
-                            size: 56, color: _textSecondary),
-                        SizedBox(height: 12),
-                        Text('Nenhum pedido ainda',
+                        Container(
+                          width: 84,
+                          height: 84,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEDEFF5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.inbox_outlined,
+                              size: 38, color: _textSecondary),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('Nenhum pedido ainda',
                             style: TextStyle(
                                 fontSize: 16,
-                                color: _textSecondary,
-                                fontWeight: FontWeight.w500)),
-                        SizedBox(height: 4),
-                        Text('Seus pedidos aparecerão aqui.',
+                                color: _black,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        const Text('Seus pedidos aparecerão aqui.',
                             style: TextStyle(
                                 fontSize: 13, color: _textSecondary)),
                       ],
@@ -320,7 +330,7 @@ class MeusPedidosPage extends StatelessWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: docs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
                   itemBuilder: (context, i) {
                     final data      = docs[i].data() as Map<String, dynamic>;
                     final pedidoId  = docs[i].id;
@@ -339,417 +349,426 @@ class MeusPedidosPage extends StatelessWidget {
                     return Container(
                       decoration: BoxDecoration(
                         color: _white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color.fromRGBO(0, 0, 0, 0.06),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                            color: const Color.fromRGBO(15, 15, 30, 0.06),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-
-                          // Cabeçalho
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44, height: 44,
-                                  decoration: BoxDecoration(
-                                    color: Color.fromRGBO(
-                                        cor.red, cor.green, cor.blue, 0.12),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(Icons.receipt_long_outlined,
-                                      color: cor, size: 22),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        titulo,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                            color: _black),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (categoria.isNotEmpty)
-                                        Text(categoria,
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                color: _accent,
-                                                fontWeight: FontWeight.w600)),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Color.fromRGBO(
-                                        cor.red, cor.green, cor.blue, 0.12),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    _labelStatus(status),
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: cor),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Valor + aviso de pagamento
-                          if (valorServico != null) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                              child: Row(
+                      clipBehavior: Clip.antiAlias,
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Faixa colorida lateral indicando o status
+                            Container(width: 4, color: cor),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.attach_money,
-                                      size: 16, color: _green),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Valor: R\$ ${(valorServico as num).toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        color: _green,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF3E0),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                      color: _orange.withOpacity(0.4)),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.info_outline,
-                                        size: 15, color: _orange),
-                                    SizedBox(width: 7),
-                                    Expanded(
-                                      child: Text(
-                                        'Faça o pagamento depois do serviço executado',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: _orange,
-                                            fontWeight: FontWeight.w600),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
 
-                          // Média do profissional + badge verificado
-                          if (providerId.isNotEmpty && status != 'aberto')
-                            FutureBuilder<DocumentSnapshot>(
-                              future: FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(providerId)
-                                  .get(),
-                              builder: (context, snapProf) {
-                                if (!snapProf.hasData ||
-                                    !snapProf.data!.exists) {
-                                  return const SizedBox();
-                                }
-                                final profData = snapProf.data!.data()
-                                    as Map<String, dynamic>;
-                                final media =
-                                    (profData['mediaAvaliacao'] as num?)
-                                            ?.toDouble() ??
-                                        0;
-                                final total =
-                                    (profData['totalAvaliacoes'] as num?)
-                                            ?.toInt() ??
-                                        0;
-                                final nome = profData['nome'] ??
-                                    profData['email'] ??
-                                    'Profissional';
-                                final verificado =
-                                    profData['verificado'] ?? false;
-
-                                return Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.person_outline,
-                                          size: 14, color: _textSecondary),
-                                      const SizedBox(width: 4),
-                                      Text(nome,
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: _textSecondary,
-                                              fontWeight: FontWeight.w500)),
-                                      if (verificado) ...[
-                                        const SizedBox(width: 6),
+                                  // Cabeçalho
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(14, 16, 14, 8),
+                                    child: Row(
+                                      children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
+                                          width: 44, height: 44,
                                           decoration: BoxDecoration(
-                                            gradient: const LinearGradient(
-                                              colors: [
-                                                Color(0xFF34C759),
-                                                Color(0xFF27A84A),
-                                              ],
-                                            ),
-                                            borderRadius:
-                                                BorderRadius.circular(20),
+                                            color: cor.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(13),
                                           ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
+                                          child: Icon(Icons.receipt_long_outlined,
+                                              color: cor, size: 22),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Icon(Icons.verified,
-                                                  color: Colors.white,
-                                                  size: 10),
-                                              SizedBox(width: 3),
                                               Text(
-                                                'Verificado',
-                                                style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 10,
-                                                    fontWeight:
-                                                        FontWeight.w700),
+                                                titulo,
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 14.5,
+                                                    color: _black),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
+                                              if (categoria.isNotEmpty)
+                                                Text(categoria,
+                                                    style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: _accent,
+                                                        fontWeight: FontWeight.w600)),
                                             ],
                                           ),
                                         ),
-                                      ],
-                                      if (media > 0) ...[
-                                        const SizedBox(width: 8),
-                                        const Icon(Icons.star,
-                                            size: 14,
-                                            color: Color(0xFFFFCC00)),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          '${media.toStringAsFixed(1)} ($total avaliações)',
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: _textSecondary,
-                                              fontWeight: FontWeight.w600),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: cor.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            _labelStatus(status),
+                                            style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: cor),
+                                          ),
                                         ),
                                       ],
-                                    ],
+                                    ),
                                   ),
-                                );
-                              },
-                            ),
+// Valor + aviso de pagamento
+                                  if (valorServico != null) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.attach_money,
+                                              size: 16, color: _green),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Valor: R\$ ${(valorServico as num).toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                color: _green,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 7),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFF3E0),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                              color: _orange.withOpacity(0.4)),
+                                        ),
+                                        child: const Row(
+                                          children: [
+                                            Icon(Icons.info_outline,
+                                                size: 15, color: _orange),
+                                            SizedBox(width: 7),
+                                            Expanded(
+                                              child: Text(
+                                                'Faça o pagamento depois do serviço executado',
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: _orange,
+                                                    fontWeight: FontWeight.w600),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
 
-                          // Avaliação já feita
-                          if (avaliacao != null)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                              child: Row(
-                                children: [
-                                  ...List.generate(
-                                      5,
-                                      (i) => Icon(
-                                            i < (avaliacao as num).toInt()
-                                                ? Icons.star
-                                                : Icons.star_border,
-                                            color: const Color(0xFFFFCC00),
-                                            size: 18,
-                                          )),
-                                  const SizedBox(width: 6),
-                                  const Text('Avaliado',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color: _textSecondary)),
+                                  // Média do profissional + badge verificado
+                                  if (providerId.isNotEmpty && status != 'aberto')
+                                    FutureBuilder<DocumentSnapshot>(
+                                      future: FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(providerId)
+                                          .get(),
+                                      builder: (context, snapProf) {
+                                        if (!snapProf.hasData ||
+                                            !snapProf.data!.exists) {
+                                          return const SizedBox();
+                                        }
+                                        final profData = snapProf.data!.data()
+                                            as Map<String, dynamic>;
+                                        final media =
+                                            (profData['mediaAvaliacao'] as num?)
+                                                    ?.toDouble() ??
+                                                0;
+                                        final total =
+                                            (profData['totalAvaliacoes'] as num?)
+                                                    ?.toInt() ??
+                                                0;
+                                        final nome = profData['nome'] ??
+                                            profData['email'] ??
+                                            'Profissional';
+                                        final verificado =
+                                            profData['verificado'] ?? false;
+
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.person_outline,
+                                                  size: 14, color: _textSecondary),
+                                              const SizedBox(width: 4),
+                                              Text(nome,
+                                                  style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: _textSecondary,
+                                                      fontWeight: FontWeight.w500)),
+                                              if (verificado) ...[
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                      horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    gradient: const LinearGradient(
+                                                      colors: [
+                                                        Color(0xFF16A34A),
+                                                        Color(0xFF15803D),
+                                                      ],
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(20),
+                                                  ),
+                                                  child: const Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.verified,
+                                                          color: Colors.white,
+                                                          size: 10),
+                                                      SizedBox(width: 3),
+                                                      Text(
+                                                        'Verificado',
+                                                        style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.w700),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                              if (media > 0) ...[
+                                                const SizedBox(width: 8),
+                                                const Icon(Icons.star_rounded,
+                                                    size: 14,
+                                                    color: Color(0xFFFFC94D)),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  '${media.toStringAsFixed(1)} ($total avaliações)',
+                                                  style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: _textSecondary,
+                                                      fontWeight: FontWeight.w600),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+
+                                  // Avaliação já feita
+                                  if (avaliacao != null)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                                      child: Row(
+                                        children: [
+                                          ...List.generate(
+                                              5,
+                                              (i) => Icon(
+                                                    i < (avaliacao as num).toInt()
+                                                        ? Icons.star_rounded
+                                                        : Icons.star_border_rounded,
+                                                    color: const Color(0xFFFFC94D),
+                                                    size: 18,
+                                                  )),
+                                          const SizedBox(width: 6),
+                                          const Text('Avaliado',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: _textSecondary)),
+                                        ],
+                                      ),
+                                    ),
+
+                                  // Botões
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                                    child: Column(
+                                      children: [
+
+                                        // Botão chat
+                                        if (status == 'aceito')
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 46,
+                                            child: ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: _black,
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(12)),
+                                                elevation: 0,
+                                              ),
+                                              icon: const Icon(Icons.chat_outlined,
+                                                  size: 16, color: _white),
+                                              label: const Text('Abrir chat',
+                                                  style: TextStyle(
+                                                      color: _white,
+                                                      fontWeight: FontWeight.w700)),
+                                              onPressed: () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        ChatPage(chatId: chatId)),
+                                              ),
+                                            ),
+                                          ),
+
+                                        // Botão concluir serviço
+                                        if (status == 'aceito') ...[
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFF4D6),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                  color: const Color(0xFFFFC93C)),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              children: [
+                                                const Text(
+                                                  'Código de confirmação',
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Color(0xFF8A6D00)),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  codigoConfirmacao,
+                                                  style: const TextStyle(
+                                                      fontSize: 22,
+                                                      fontWeight: FontWeight.w800,
+                                                      letterSpacing: 4,
+                                                      color: Color(0xFF5C4700)),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                const Text(
+                                                  'Só passe esse código pro profissional quando o serviço estiver pronto e você satisfeito. É ele que libera o pagamento.',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Color(0xFF8A6D00)),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+
+                                        // Botão cancelar
+                                        if (status == 'aceito' || status == 'aberto' || status == 'pendente' || status == 'open') ...[
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 46,
+                                            child: OutlinedButton.icon(
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: _red,
+                                                side: const BorderSide(color: _red),
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(12)),
+                                              ),
+                                              icon: const Icon(Icons.cancel_outlined,
+                                                  size: 16),
+                                              label: const Text('Cancelar pedido',
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.w700)),
+                                              onPressed: () =>
+                                                  _cancelarPedido(context, pedidoId),
+                                            ),
+                                          ),
+                                        ],
+
+                                        // Ver perfil profissional
+                                        if (providerId.isNotEmpty &&
+                                            status != 'aberto') ...[
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 46,
+                                            child: OutlinedButton.icon(
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: _accent,
+                                                side: const BorderSide(color: _accent),
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(12)),
+                                              ),
+                                              icon: const Icon(Icons.person_outline,
+                                                  size: 16),
+                                              label: const Text(
+                                                  'Ver perfil do profissional',
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.w700)),
+                                              onPressed: () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      PerfilProfissionalPage(
+                                                          providerId: providerId),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+
+                                        // Avaliar profissional
+                                        if (status == 'concluido' &&
+                                            avaliacao == null &&
+                                            providerId.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 46,
+                                            child: ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    const Color(0xFFFFC94D),
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(12)),
+                                                elevation: 0,
+                                              ),
+                                              icon: const Icon(Icons.star_outline_rounded,
+                                                  size: 16, color: _black),
+                                              label: const Text(
+                                                'Avaliar profissional',
+                                                style: TextStyle(
+                                                    color: _black,
+                                                    fontWeight: FontWeight.w700),
+                                              ),
+                                              onPressed: () => _abrirAvaliacao(
+                                                  context, pedidoId, providerId),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
-
-                          // Botões
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            child: Column(
-                              children: [
-
-                                // Botão chat
-                                if (status == 'aceito')
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 44,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _black,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
-                                        elevation: 0,
-                                      ),
-                                      icon: const Icon(Icons.chat_outlined,
-                                          size: 16, color: _white),
-                                      label: const Text('Abrir chat',
-                                          style: TextStyle(
-                                              color: _white,
-                                              fontWeight: FontWeight.w700)),
-                                      onPressed: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                                ChatPage(chatId: chatId)),
-                                      ),
-                                    ),
-                                  ),
-
-                                // Botão concluir serviço
-                                if (status == 'aceito') ...[
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF4D6),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: const Color(0xFFFFC93C)),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        const Text(
-                                          'Código de confirmação',
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: Color(0xFF8A6D00)),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          codigoConfirmacao,
-                                          style: const TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 4,
-                                              color: Color(0xFF5C4700)),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        const Text(
-                                          'Só passe esse código pro profissional quando o serviço estiver pronto e você satisfeito. É ele que libera o pagamento.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color: Color(0xFF8A6D00)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-
-                                // Botão cancelar
-                                if (status == 'aceito' || status == 'aberto' || status == 'pendente' || status == 'open') ...[
-                                  const SizedBox(height: 8),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 44,
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: _red,
-                                        side: const BorderSide(color: _red),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
-                                      ),
-                                      icon: const Icon(Icons.cancel_outlined,
-                                          size: 16),
-                                      label: const Text('Cancelar pedido',
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.w700)),
-                                      onPressed: () =>
-                                          _cancelarPedido(context, pedidoId),
-                                    ),
-                                  ),
-                                ],
-
-                                // Ver perfil profissional
-                                if (providerId.isNotEmpty &&
-                                    status != 'aberto') ...[
-                                  const SizedBox(height: 8),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 44,
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: _accent,
-                                        side: const BorderSide(color: _accent),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
-                                      ),
-                                      icon: const Icon(Icons.person_outline,
-                                          size: 16),
-                                      label: const Text(
-                                          'Ver perfil do profissional',
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.w700)),
-                                      onPressed: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              PerfilProfissionalPage(
-                                                  providerId: providerId),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-
-                                // Avaliar profissional
-                                if (status == 'concluido' &&
-                                    avaliacao == null &&
-                                    providerId.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 44,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            const Color(0xFFFFCC00),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12)),
-                                        elevation: 0,
-                                      ),
-                                      icon: const Icon(Icons.star_outline,
-                                          size: 16, color: _black),
-                                      label: const Text(
-                                        'Avaliar profissional',
-                                        style: TextStyle(
-                                            color: _black,
-                                            fontWeight: FontWeight.w700),
-                                      ),
-                                      onPressed: () => _abrirAvaliacao(
-                                          context, pedidoId, providerId),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   },
