@@ -15,11 +15,13 @@ class PerfilPage extends StatefulWidget {
 }
 
 class _PerfilPageState extends State<PerfilPage> {
-  static const _black         = Color(0xFF000000);
+  // ─── Tema (mesmo padrão navy usado no resto do app) ─────────────────────────
+  static const _black         = Color(0xFF0A0A12);
+  static const _navyDark      = Color(0xFF0A0A16);
   static const _white         = Color(0xFFFFFFFF);
-  static const _accent        = Color(0xFF276EF1);
-  static const _surface       = Color(0xFFF6F6F6);
-  static const _textSecondary = Color(0xFF757575);
+  static const _accent        = Color(0xFF2F6FED);
+  static const _surface       = Color(0xFFF3F4F8);
+  static const _textSecondary = Color(0xFF6B7280);
   static const _red           = Color(0xFFFF3B30);
   static const _green         = Color(0xFF34C759);
 
@@ -150,24 +152,39 @@ class _PerfilPageState extends State<PerfilPage> {
     }
   }
 
+  // ─── Card branco com sombra suave, radius 18 (padrão do resto do app) ───────
+  BoxDecoration get _cardDecoration => BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromRGBO(15, 15, 30, 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      );
+
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: _textSecondary),
+      labelStyle: const TextStyle(color: _textSecondary),
+      prefixIcon: Icon(icon, color: _accent),
       filled: true,
       fillColor: _white,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _accent, width: 2),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: _accent, width: 1.5),
       ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
@@ -178,16 +195,16 @@ class _PerfilPageState extends State<PerfilPage> {
     return Scaffold(
       backgroundColor: _surface,
       appBar: AppBar(
-        backgroundColor: _black,
+        backgroundColor: _navyDark,
         foregroundColor: _white,
         elevation: 0,
         title: const Text(
           'Meu Perfil',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -199,23 +216,35 @@ class _PerfilPageState extends State<PerfilPage> {
                 child: Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    CircleAvatar(
-                      radius: 56,
-                      backgroundColor: _accent.withOpacity(0.1),
-                      backgroundImage: _fotoBytes != null
-                          ? MemoryImage(_fotoBytes!)
-                          : null,
-                      child: _fotoBytes == null
-                          ? Text(
-                              _nomeCtrl.text.isNotEmpty
-                                  ? _nomeCtrl.text[0].toUpperCase()
-                                  : (user?.email?[0].toUpperCase() ?? 'U'),
-                              style: const TextStyle(
-                                  fontSize: 38,
-                                  fontWeight: FontWeight.w700,
-                                  color: _accent),
-                            )
-                          : null,
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: _accent.withOpacity(0.25),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 56,
+                        backgroundColor: _accent.withOpacity(0.1),
+                        backgroundImage: _fotoBytes != null
+                            ? MemoryImage(_fotoBytes!)
+                            : null,
+                        child: _fotoBytes == null
+                            ? Text(
+                                _nomeCtrl.text.isNotEmpty
+                                    ? _nomeCtrl.text[0].toUpperCase()
+                                    : (user?.email?[0].toUpperCase() ?? 'U'),
+                                style: const TextStyle(
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.w700,
+                                    color: _accent),
+                              )
+                            : null,
+                      ),
                     ),
                     Container(
                       width: 34,
@@ -239,7 +268,7 @@ class _PerfilPageState extends State<PerfilPage> {
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             const Center(
               child: Text(
@@ -251,35 +280,43 @@ class _PerfilPageState extends State<PerfilPage> {
             const SizedBox(height: 32),
 
             // ── NOME ─────────────────────────────────────────────────────────
-            TextField(
-              controller: _nomeCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: _inputDecoration('Nome completo', Icons.person_outline),
+            Container(
+              decoration: _cardDecoration,
+              child: TextField(
+                controller: _nomeCtrl,
+                textCapitalization: TextCapitalization.words,
+                style: const TextStyle(color: _black),
+                decoration: _inputDecoration('Nome completo', Icons.person_outline),
+              ),
             ),
 
             const SizedBox(height: 14),
 
             // ── TELEFONE ──────────────────────────────────────────────────────
-            TextField(
-              controller: _telefoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: _inputDecoration('Telefone / WhatsApp', Icons.phone_outlined),
+            Container(
+              decoration: _cardDecoration,
+              child: TextField(
+                controller: _telefoneCtrl,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: _black),
+                decoration: _inputDecoration('Telefone / WhatsApp', Icons.phone_outlined),
+              ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
             // ── BOTÃO SALVAR ──────────────────────────────────────────────────
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 54,
               child: ElevatedButton(
                 onPressed: _loading ? null : _salvar,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _black,
+                  backgroundColor: _accent,
                   foregroundColor: _white,
                   disabledBackgroundColor: Colors.grey.shade400,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(16)),
                   elevation: 0,
                 ),
                 child: _loading
@@ -297,8 +334,8 @@ class _PerfilPageState extends State<PerfilPage> {
               ),
             ),
 
-            const SizedBox(height: 48),
-            const Divider(color: Color(0xFFE0E0E0)),
+            const SizedBox(height: 40),
+            const Divider(color: Color(0xFFE3E5EC)),
             const SizedBox(height: 24),
 
             // ── SOBRE ────────────────────────────────────────────────────────
@@ -314,33 +351,35 @@ class _PerfilPageState extends State<PerfilPage> {
 
             const SizedBox(height: 12),
 
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const TermosDeUsoPage()),
-                ),
-                icon: const Icon(Icons.description_outlined, color: _black),
-                label: const Text(
-                  'Termos de Uso e Privacidade',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: _black),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFE0E0E0)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+            Container(
+              decoration: _cardDecoration,
+              child: SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const TermosDeUsoPage()),
+                  ),
+                  icon: const Icon(Icons.description_outlined, color: _accent),
+                  label: const Text(
+                    'Termos de Uso e Privacidade',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _black),
+                  ),
+                  style: TextButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18)),
+                  ),
                 ),
               ),
             ),
 
             const SizedBox(height: 32),
-            const Divider(color: Color(0xFFE0E0E0)),
+            const Divider(color: Color(0xFFE3E5EC)),
             const SizedBox(height: 24),
 
             // ── ZONA DE PERIGO ────────────────────────────────────────────────
@@ -356,27 +395,40 @@ class _PerfilPageState extends State<PerfilPage> {
 
             const SizedBox(height: 12),
 
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const ExcluirContaPage()),
-                ),
-                icon: const Icon(Icons.delete_outline, color: _red),
-                label: const Text(
-                  'Excluir minha conta',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: _red),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: _red),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+            Container(
+              decoration: BoxDecoration(
+                color: _white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: _red.withOpacity(0.35)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color.fromRGBO(15, 15, 30, 0.05),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ExcluirContaPage()),
+                  ),
+                  icon: const Icon(Icons.delete_outline, color: _red),
+                  label: const Text(
+                    'Excluir minha conta',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _red),
+                  ),
+                  style: TextButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18)),
+                  ),
                 ),
               ),
             ),

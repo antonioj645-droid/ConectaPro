@@ -318,47 +318,23 @@ class _LoginPageState extends State<LoginPage>
                             ],
                           ),
                           child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/logo_qp.jpeg',
-                              fit: BoxFit.cover,
+                            child: Transform.scale(
+                              scale: 1.35,
+                              child: Image.asset(
+                                'assets/images/logo_cp.jpeg',
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: 18),
-
-                        // TÍTULO
-                        RichText(
-                          text: const TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'QP ',
-                                style: TextStyle(
-                                    color: _accentLight,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1),
-                              ),
-                              TextSpan(
-                                text: 'QONEX',
-                                style: TextStyle(
-                                    color: _white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 6),
+const SizedBox(height: 20),
 
                         const Text(
                           'Conectando você aos profissionais certos.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: _textSecondary,
-fontSize: 13.5,
+                            fontSize: 13.5,
                           ),
                         ),
 

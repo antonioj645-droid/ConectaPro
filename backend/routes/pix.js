@@ -71,19 +71,27 @@ async function buscarQr(paymentId) {
 }
 
 // CLIENTE
-async function getCliente(nome, email) {
+async function getCliente(nome, email, cpfCnpj) {
 
   const { data } = await asaas.get("/customers", {
     params: { email },
   });
 
   if (data.data.length > 0) {
-    return data.data[0].id;
+    const existente = data.data[0];
+
+    // Cliente já existe mas ainda não tem CPF/CNPJ cadastrado — atualiza.
+    if (!existente.cpfCnpj && cpfCnpj) {
+      await asaas.put(`/customers/${existente.id}`, { cpfCnpj });
+    }
+
+    return existente.id;
   }
 
   const novo = await asaas.post("/customers", {
     name: nome,
     email,
+    cpfCnpj,
   });
 
   return novo.data.id;
@@ -95,11 +103,20 @@ async function getCliente(nome, email) {
 
 router.post("/criar-pix", async (req, res) => {
 
-  const { valor, nome, email } = req.body;
+  const { valor, nome, email, cpfCnpj } = req.body;
+
+  const cpfCnpjLimpo = (cpfCnpj || "").replace(/\D/g, "");
+
+  if (cpfCnpjLimpo.length !== 11 && cpfCnpjLimpo.length !== 14) {
+    return res.status(400).json({
+      success: false,
+      error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.",
+    });
+  }
 
   try {
 
-    const cliente = await getCliente(nome, email);
+    const cliente = await getCliente(nome, email, cpfCnpjLimpo);
 
     const response = await asaas.post("/payments", {
       customer: cliente,
@@ -132,14 +149,16 @@ router.post("/criar-pix", async (req, res) => {
 
   } catch (error) {
 
+    const detalhes = error.response?.data || { message: error.message };
+
     console.error(
       "❌ ERRO PIX:",
-      error.response?.data || error.message
+      JSON.stringify(detalhes, null, 2)
     );
 
     return res.status(500).json({
       success: false,
-      error: error.response?.data || error.message,
+      error: detalhes,
     });
   }
 });

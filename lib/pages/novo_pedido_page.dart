@@ -121,9 +121,6 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       'Contador','Advogado','Consultoria','Marketing Digital',
       'Social Media','Designer Gráfico','Redator','Tradução',
     ],
-    'Entregas': [
-      'Motoboy','Bike Entregador','Entregador de Carro',
-    ],
     'Outros Serviços': [
       'Dedetização','Controle de Pragas','Lavagem de Caixa d\'Água',
       'Soldador','Tapeceiro','Restauração de Móveis',

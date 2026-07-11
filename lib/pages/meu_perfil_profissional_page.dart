@@ -15,11 +15,13 @@ class MeuPerfilProfissionalPage extends StatefulWidget {
 
 class _MeuPerfilProfissionalPageState
     extends State<MeuPerfilProfissionalPage> {
-  static const _black         = Color(0xFF000000);
+  // ─── Tema (mesmo padrão navy usado no resto do app) ─────────────────────────
+  static const _black         = Color(0xFF0A0A12);
+  static const _navyDark      = Color(0xFF0A0A16);
   static const _white         = Color(0xFFFFFFFF);
-  static const _accent        = Color(0xFF276EF1);
-  static const _surface       = Color(0xFFF6F6F6);
-  static const _textSecondary = Color(0xFF757575);
+  static const _accent        = Color(0xFF2F6FED);
+  static const _surface       = Color(0xFFF3F4F8);
+  static const _textSecondary = Color(0xFF6B7280);
   static const _green         = Color(0xFF34C759);
   static const _red           = Color(0xFFFF3B30);
   static const _gold          = Color(0xFFFFCC00);
@@ -190,6 +192,19 @@ class _MeuPerfilProfissionalPageState
     return null;
   }
 
+  // ─── Card branco com sombra suave, radius 18 (padrão do resto do app) ───────
+  BoxDecoration get _cardDecoration => BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromRGBO(15, 15, 30, 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -197,12 +212,12 @@ class _MeuPerfilProfissionalPageState
     return Scaffold(
       backgroundColor: _surface,
       appBar: AppBar(
-        backgroundColor: _black,
+        backgroundColor: _navyDark,
         foregroundColor: _white,
         elevation: 0,
         title: const Text(
           'Meu Perfil',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
         ),
       ),
       body: _carregando
@@ -220,12 +235,12 @@ class _MeuPerfilProfissionalPageState
                           horizontal: 18, vertical: 10),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFFFCC00), Color(0xFFFF9500)],
+                          colors: [Color(0xFF34C759), Color(0xFF1FA24A)],
                         ),
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFFFCC00).withOpacity(0.4),
+                            color: _green.withOpacity(0.4),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -258,21 +273,33 @@ class _MeuPerfilProfissionalPageState
                     child: Stack(
                       alignment: Alignment.bottomRight,
                       children: [
-                        CircleAvatar(
-                          radius: 60,
-                          backgroundColor: _accent.withOpacity(0.1),
-                          backgroundImage: _imagemAtual,
-                          child: _imagemAtual == null
-                              ? Text(
-                                  _nomeCtrl.text.isNotEmpty
-                                      ? _nomeCtrl.text[0].toUpperCase()
-                                      : (user?.email?[0].toUpperCase() ?? 'P'),
-                                  style: const TextStyle(
-                                      fontSize: 42,
-                                      fontWeight: FontWeight.w700,
-                                      color: _accent),
-                                )
-                              : null,
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: _accent.withOpacity(0.25),
+                                blurRadius: 24,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 60,
+                            backgroundColor: _accent.withOpacity(0.1),
+                            backgroundImage: _imagemAtual,
+                            child: _imagemAtual == null
+                                ? Text(
+                                    _nomeCtrl.text.isNotEmpty
+                                        ? _nomeCtrl.text[0].toUpperCase()
+                                        : (user?.email?[0].toUpperCase() ?? 'P'),
+                                    style: const TextStyle(
+                                        fontSize: 42,
+                                        fontWeight: FontWeight.w700,
+                                        color: _accent),
+                                  )
+                                : null,
+                          ),
                         ),
                         Container(
                           width: 36,
@@ -330,16 +357,16 @@ class _MeuPerfilProfissionalPageState
                     hint: 'Conte um pouco sobre sua experiência...',
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: 54,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _black,
+                        backgroundColor: _accent,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                            borderRadius: BorderRadius.circular(16)),
                         elevation: 0,
                       ),
                       onPressed: _salvando ? null : _salvarPerfil,
@@ -384,26 +411,22 @@ class _MeuPerfilProfissionalPageState
         final atingiuMeta   = total >= 5 && media >= 4.5;
 
         return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE5E5E5)),
-          ),
+          padding: const EdgeInsets.all(18),
+          decoration: _cardDecoration,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Row(
                 children: [
                   Icon(Icons.verified_outlined,
-                      color: Color(0xFFFFCC00), size: 18),
+                      color: _gold, size: 18),
                   SizedBox(width: 8),
                   Text(
                     'Progresso para Verificado',
                     style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
-                        color: Color(0xFF000000)),
+                        color: _black),
                   ),
                 ],
               ),
@@ -414,8 +437,7 @@ class _MeuPerfilProfissionalPageState
                   value: progressoAval,
                   minHeight: 8,
                   backgroundColor: const Color(0xFFE5E5E5),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFFFFCC00)),
+                  valueColor: const AlwaysStoppedAnimation<Color>(_gold),
                 ),
               ),
               const SizedBox(height: 8),
@@ -430,7 +452,7 @@ class _MeuPerfilProfissionalPageState
                   Row(
                     children: [
                       const Icon(Icons.star,
-                          size: 13, color: Color(0xFFFFCC00)),
+                          size: 13, color: _gold),
                       const SizedBox(width: 2),
                       Text(
                         media > 0
@@ -468,31 +490,35 @@ class _MeuPerfilProfissionalPageState
     int linhas = 1,
     String? hint,
   }) {
-    return TextField(
-      controller: controller,
-      keyboardType: tipo,
-      maxLines: linhas,
-      style: const TextStyle(fontSize: 14, color: _black),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        hintStyle: const TextStyle(color: _textSecondary, fontSize: 13),
-        prefixIcon: Icon(icon, color: _accent, size: 20),
-        filled: true,
-        fillColor: _white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+    return Container(
+      decoration: _cardDecoration,
+      child: TextField(
+        controller: controller,
+        keyboardType: tipo,
+        maxLines: linhas,
+        style: const TextStyle(fontSize: 14, color: _black),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          hintStyle: const TextStyle(color: _textSecondary, fontSize: 13),
+          prefixIcon: Icon(icon, color: _accent, size: 20),
+          filled: true,
+          fillColor: _white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: _accent, width: 1.5),
+          ),
+          labelStyle: const TextStyle(color: _textSecondary, fontSize: 13),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _accent, width: 1.5),
-        ),
-        labelStyle: const TextStyle(color: _textSecondary, fontSize: 13),
       ),
     );
   }
@@ -523,7 +549,7 @@ class _MeuPerfilProfissionalPageState
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Divider(),
+            const Divider(color: Color(0xFFE3E5EC)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -556,11 +582,7 @@ class _MeuPerfilProfissionalPageState
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: _white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
-                ),
+                decoration: _cardDecoration,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

@@ -63,7 +63,6 @@ class _AreaClientePageState extends State<AreaClientePage> {
     {'nome': 'Pet',                         'icon': Icons.pets,                    'cor': Color(0xFF8D6E63)},
     {'nome': 'Moda',                        'icon': Icons.checkroom,               'cor': Color(0xFFAD1457)},
     {'nome': 'Serviços Empresariais',       'icon': Icons.business_center,         'cor': Color(0xFF37474F)},
-    {'nome': 'Entregas',                    'icon': Icons.delivery_dining,         'cor': Color(0xFFFF5722)},
     {'nome': 'Outros Serviços',             'icon': Icons.miscellaneous_services,  'cor': Color(0xFF757575)},
   ];
 

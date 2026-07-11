@@ -148,6 +148,20 @@ class MyApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF185FA5),
         useMaterial3: true,
       ),
+      // ✅ Padroniza o layout: em telas largas (web/desktop) o conteúdo fica
+      // centralizado com a mesma largura de um celular, evitando espaçamentos
+      // estranhos e mantendo o app com a mesma aparência em qualquer tela.
+      builder: (context, child) {
+        return Container(
+          color: const Color(0xFF0A0A16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: child,
+            ),
+          ),
+        );
+      },
       home: const SplashScreen(),
     );
   }
