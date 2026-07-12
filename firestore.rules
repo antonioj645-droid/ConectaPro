@@ -1,31 +1,39 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function logado() { return request.auth != null; }
     function souEu(uid) { return logado() && request.auth.uid == uid; }
     function meuRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
     function souAdmin() { return logado() && meuRole() == 'admin'; }
+
     match /users/{userId} {
       allow read: if logado();
+
       allow create: if souEu(userId)
         && request.resource.data.role in ['cliente', 'profissional']
         && request.resource.data.blocked == false;
+
       allow update: if souAdmin() || (
         souEu(userId)
         && request.resource.data.role == resource.data.role
         && request.resource.data.balance == resource.data.balance
         && request.resource.data.blocked == resource.data.blocked
       );
+
       allow delete: if false;
     }
+
     match /requests/{pedidoId} {
       allow read: if logado();
+
       allow create: if logado()
         && request.resource.data.clienteId == request.auth.uid
         && request.resource.data.providerId == null
         && request.resource.data.status == 'aberto';
+
       allow update: if souAdmin() || (logado() && (
         (resource.data.clienteId == request.auth.uid
           && request.resource.data.clienteId == resource.data.clienteId
@@ -34,9 +42,19 @@ service cloud.firestore {
         (resource.data.providerId == null
           && request.resource.data.providerId == request.auth.uid
           && request.resource.data.status == 'aceito')
+        ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visualizacoes'])
+          && request.resource.data.visualizacoes == resource.data.visualizacoes + 1)
+        ||
+        (resource.data.providerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['valorServico'])
+          && request.resource.data.valorServico is number
+          && request.resource.data.valorServico > 0)
       ));
+
       allow delete: if souAdmin() || resource.data.clienteId == request.auth.uid;
     }
+
     match /chats/{chatId} {
       function participanteDoChat() {
         return chatId == 'suporte_' + request.auth.uid ||
@@ -44,26 +62,33 @@ service cloud.firestore {
            (get(/databases/$(database)/documents/requests/$(chatId)).data.clienteId == request.auth.uid ||
             get(/databases/$(database)/documents/requests/$(chatId)).data.providerId == request.auth.uid));
       }
+
       allow read, write: if logado() && (participanteDoChat() || souAdmin());
+
       match /messages/{messageId} {
         allow read, write: if logado() && (participanteDoChat() || souAdmin());
       }
     }
+
     match /suporte_chats/{userId} {
       allow read, write: if souAdmin() || souEu(userId);
     }
+
     match /pix_payments/{paymentId} {
       allow read: if logado() && resource.data.userId == request.auth.uid;
       allow write: if false;
     }
+
     match /earnings/{docId} {
       allow read: if souAdmin();
       allow write: if false;
     }
+
     match /config/{docId} {
       allow read: if true;
       allow write: if false;
     }
+
     match /{document=**} {
       allow read, write: if false;
     }

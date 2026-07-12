@@ -251,16 +251,11 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         }
 
         final ruaPedido    = pedidoData['rua'] ?? '';
-        final numeroPedido = pedidoData['numero'] ?? '';
         final bairroPedido = pedidoData['bairro'] ?? pedidoData['neighborhood'] ?? '';
         final cidadePedido = pedidoData['cidade'] ?? '';
         final estadoPedido = pedidoData['estado'] ?? '';
-        final ruaComNumero = [
-          if (ruaPedido.toString().isNotEmpty) ruaPedido,
-          if (numeroPedido.toString().isNotEmpty) numeroPedido,
-        ].join(', ');
         final localizacaoPedido = [
-          if (ruaComNumero.isNotEmpty) ruaComNumero,
+          if (ruaPedido.toString().isNotEmpty) ruaPedido,
           if (bairroPedido.toString().isNotEmpty) bairroPedido,
           if (cidadePedido.toString().isNotEmpty)
             estadoPedido.toString().isNotEmpty

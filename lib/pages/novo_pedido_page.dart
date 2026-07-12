@@ -24,6 +24,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
   final _descricaoCtrl = TextEditingController();
   final _cepCtrl       = TextEditingController();
   final _ruaCtrl       = TextEditingController();
+  final _numeroCtrl    = TextEditingController();
   final _bairroCtrl    = TextEditingController();
   final _cidadeCtrl    = TextEditingController();
   final _estadoCtrl    = TextEditingController();
@@ -141,6 +142,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
     _descricaoCtrl.dispose();
     _cepCtrl.dispose();
     _ruaCtrl.dispose();
+    _numeroCtrl.dispose();
     _bairroCtrl.dispose();
     _cidadeCtrl.dispose();
     _estadoCtrl.dispose();
@@ -197,11 +199,12 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
     }
   }
 
-  // ─── Geocodifica o endereço (rua, bairro, cidade, UF) em lat/long ──────────
+  // ─── Geocodifica o endereço (rua, número, bairro, cidade, UF) em lat/long ──
   // Usa a API pública do OpenStreetMap (Nominatim), sem necessidade de chave.
   Future<void> _geocodificarEndereco() async {
     final partes = [
       _ruaCtrl.text.trim(),
+      _numeroCtrl.text.trim(),
       _bairroCtrl.text.trim(),
       _cidadeCtrl.text.trim(),
       _estadoCtrl.text.trim(),
@@ -286,6 +289,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
         'subcategoria': _subcategoriaSelecionada,
         'bairro':       _bairroCtrl.text.trim(),
         'rua':          _ruaCtrl.text.trim(),
+        'numero':       _numeroCtrl.text.trim(),
         'cep':          _cepCtrl.text.trim(),
         'cidade':       _cidadeCtrl.text.trim(),
         'estado':       _estadoCtrl.text.trim(),
@@ -533,14 +537,35 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
 
             const SizedBox(height: 16),
 
-            // RUA
-            TextFormField(
-              controller: _ruaCtrl,
-              decoration: _decoracaoPadrao(
-                label: 'Rua',
-                hint: 'Ex: Rua das Flores',
-                icone: Icons.signpost_outlined,
-              ),
+            // RUA E NÚMERO
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextFormField(
+                    controller: _ruaCtrl,
+                    decoration: _decoracaoPadrao(
+                      label: 'Rua',
+                      hint: 'Ex: Rua das Flores',
+                      icone: Icons.signpost_outlined,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: TextFormField(
+                    controller: _numeroCtrl,
+                    keyboardType: TextInputType.text,
+                    decoration: _decoracaoPadrao(
+                      label: 'Número',
+                      hint: 'Ex: 123',
+                      icone: Icons.pin_outlined,
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 16),

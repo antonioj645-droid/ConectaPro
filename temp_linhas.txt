@@ -1,0 +1,1319 @@
+1:import 'dart:convert';
+3:import 'package:flutter/material.dart';
+4:import 'package:cloud_firestore/cloud_firestore.dart';
+5:import 'package:firebase_auth/firebase_auth.dart';
+6:import 'package:geolocator/geolocator.dart';
+7:import 'package:http/http.dart' as http;
+8:import 'package:url_launcher/url_launcher.dart';
+10:import 'chat_page.dart';
+11:import 'pix_dialog.dart';
+12:import '../main.dart';
+13:import 'meus_servicos_page.dart';
+14:import 'historico_servicos_page.dart';
+15:import 'meu_perfil_profissional_page.dart';
+17:class AreaProfissionalPage extends StatefulWidget {
+18:  AreaProfissionalPage({Key? key}) : super(key: key);
+20:  @override
+21:  State<AreaProfissionalPage> createState() => _AreaProfissionalPageState();
+22:}
+24:class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
+25:  // ─── Tema ──────────────────────────────────────────────────────────────────
+26:  static const _black         = Color(0xFF0A0A12);
+27:  static const _navyDark      = Color(0xFF0A0A16);
+28:  static const _navyLight     = Color(0xFF1B1F3B);
+29:  static const _white         = Color(0xFFFFFFFF);
+30:  static const _accent        = Color(0xFF2F6FED);
+31:  static const _surface       = Color(0xFFF3F4F8);
+32:  static const _textSecondary = Color(0xFF6B7280);
+33:  static const _premiumGold   = Color(0xFFFFC94D);
+34:  static const _verified      = Color(0xFF34C759);
+36:  final Set<String> _processandoPedidos = {};
+37:  final Set<String> _visualizados = {};
+38:  final Set<String> _favoritos = {};
+39:  double? _minhaLat;
+40:  double? _minhaLng;
+42:  // ─── Estilo por categoria (cor + ícone) ─────────────────────────────────────
+43:  Map<String, dynamic> _categoriaEstilo(String categoria) {
+44:    final cat = categoria.toLowerCase();
+45:    if (cat.contains('elétric') || cat.contains('eletric')) {
+46:      return {'cor': const Color(0xFF2F6FED), 'icone': Icons.bolt_rounded};
+47:    }
+48:    if (cat.contains('hidráulic') ||
+49:        cat.contains('hidraulic') ||
+50:        cat.contains('encanad') ||
+51:        cat.contains('vazamento')) {
+52:      return {'cor': const Color(0xFF16A34A), 'icone': Icons.water_drop_rounded};
+53:    }
+54:    if (cat.contains('pint')) {
+55:      return {'cor': const Color(0xFF9333EA), 'icone': Icons.format_paint_rounded};
+56:    }
+57:    if (cat.contains('montagem') ||
+58:        cat.contains('marcenaria') ||
+59:        cat.contains('móve') ||
+60:        cat.contains('move')) {
+61:      return {'cor': const Color(0xFFEA580C), 'icone': Icons.handyman_rounded};
+62:    }
+63:    if (cat.contains('limp')) {
+64:      return {'cor': const Color(0xFF0D9488), 'icone': Icons.cleaning_services_rounded};
+65:    }
+66:    if (cat.contains('jardin') || cat.contains('jardim')) {
+67:      return {'cor': const Color(0xFF65A30D), 'icone': Icons.grass_rounded};
+68:    }
+69:    return {'cor': _accent, 'icone': Icons.build_circle_outlined};
+70:  }
+72:  // ─── Pedido é recente (últimos 60 min) ──────────────────────────────────────
+73:  bool _isRecente(dynamic criadoEm) {
+74:    if (criadoEm == null || criadoEm is! Timestamp) return false;
+75:    final dt = criadoEm.toDate();
+76:    return DateTime.now().difference(dt).inMinutes < 60;
+77:  }
+79:  @override
+80:  void initState() {
+81:    super.initState();
+82:    _salvarLocalizacao();
+83:  }
+85:  // ─── Localização ───────────────────────────────────────────────────────────
+86:  Future<void> _salvarLocalizacao() async {
+87:    final user = FirebaseAuth.instance.currentUser;
+88:    if (user == null) return;
+89:    try {
+90:      final permission = await Geolocator.requestPermission();
+91:      if (permission == LocationPermission.denied ||
+92:          permission == LocationPermission.deniedForever) return;
+93:      final pos = await Geolocator.getCurrentPosition();
+94:      if (mounted) {
+95:        setState(() {
+96:          _minhaLat = pos.latitude;
+97:          _minhaLng = pos.longitude;
+98:        });
+99:      }
+100:      await FirebaseFirestore.instance
+101:          .collection('users')
+102:          .doc(user.uid)
+103:          .update({'latitude': pos.latitude, 'longitude': pos.longitude});
+104:    } catch (_) {}
+105:  }
+107:  // ─── Registrar visualização do pedido (para contagem de interessados) ──────
+108:  Future<void> _registrarVisualizacao(String pedidoId) async {
+109:    if (_visualizados.contains(pedidoId)) return;
+110:    _visualizados.add(pedidoId);
+111:    try {
+112:      await FirebaseFirestore.instance
+113:          .collection('requests')
+114:          .doc(pedidoId)
+115:          .update({'visualizacoes': FieldValue.increment(1)});
+116:    } catch (_) {}
+117:  }
+119:  // ─── Abrir chat de suporte com o admin ──────────────────────────────────────
+120:  Future<void> _abrirSuporte() async {
+121:    final user = FirebaseAuth.instance.currentUser;
+122:    if (user == null) return;
+124:    final chatId = 'suporte_${user.uid}';
+126:    final docUser = await FirebaseFirestore.instance
+127:        .collection('users')
+128:        .doc(user.uid)
+129:        .get();
+130:    final nome = docUser.data()?['nome'] ??
+131:        docUser.data()?['name'] ??
+132:        user.email ??
+133:        'Usuário';
+135:    await FirebaseFirestore.instance
+136:        .collection('suporte_chats')
+137:        .doc(user.uid)
+138:        .set({
+139:      'userId': user.uid,
+140:      'nome': nome,
+141:      'tipo': 'profissional',
+142:      'chatId': chatId,
+143:      'updatedAt': FieldValue.serverTimestamp(),
+144:    }, SetOptions(merge: true));
+146:    if (!mounted) return;
+147:    Navigator.push(
+148:      context,
+149:      MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)),
+150:    );
+151:  }
+153:  // ─── Abrir Google Maps com a localização do pedido ─────────────────────────
+154:  Future<void> _abrirLocalizacao({
+155:    double? lat,
+156:    double? lng,
+157:    required String endereco,
+158:  }) async {
+159:    Uri uri;
+160:    if (lat != null && lng != null) {
+161:      uri = Uri.parse(
+162:          'https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+163:    } else {
+164:      final query = Uri.encodeComponent(endereco);
+165:      uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+166:    }
+167:    try {
+168:      await launchUrl(uri, mode: LaunchMode.externalApplication);
+169:    } catch (_) {
+170:      if (mounted) {
+171:        ScaffoldMessenger.of(context).showSnackBar(
+172:          const SnackBar(content: Text('Não foi possível abrir o mapa.')),
+173:        );
+174:      }
+175:    }
+176:  }
+178:  // ─── Desbloquear pedido ────────────────────────────────────────────────────
+179:  Future<void> _desbloquearPedido(String pedidoId, String? chatId) async {
+180:    if (_processandoPedidos.contains(pedidoId)) return;
+181:    setState(() => _processandoPedidos.add(pedidoId));
+183:    final user = FirebaseAuth.instance.currentUser;
+184:    if (user == null) {
+185:      setState(() => _processandoPedidos.remove(pedidoId));
+186:      return;
+187:    }
+189:    try {
+190:      final docUser = await FirebaseFirestore.instance
+191:          .collection('users')
+192:          .doc(user.uid)
+193:          .get();
+195:      final saldo = ((docUser.data()?['balance'] ?? 0) as num).toDouble();
+197:      // Saldo insuficiente → abre PIX para adicionar saldo
+198:      if (saldo < 1) {
+199:        setState(() => _processandoPedidos.remove(pedidoId));
+200:        if (!mounted) return;
+201:        showDialog(
+202:          context: context,
+203:          builder: (_) => const PixDialog(),
+204:        );
+205:        return;
+206:      }
+208:      final uri = Uri.https(
+209:        'conectapro-backend-1.onrender.com',
+210:        '/carteira/desbloquear',
+211:      );
+213:      final response = await http.post(
+214:        uri,
+215:        headers: {'Content-Type': 'application/json'},
+216:        body: jsonEncode({'userId': user.uid, 'pedidoId': pedidoId}),
+217:      );
+219:      if (response.statusCode != 200) throw Exception(response.body);
+221:      final data = jsonDecode(response.body);
+223:      if (data['success'] == true) {
+224:        await FirebaseFirestore.instance
+225:            .collection('requests')
+226:            .doc(pedidoId)
+227:            .update({
+228:          'providerId': user.uid,
+229:          'status': 'aceito',
+230:          'acceptedAt': FieldValue.serverTimestamp(),
+231:        });
+233:        final chatFinal =
+234:            (chatId != null && chatId.isNotEmpty) ? chatId : pedidoId;
+236:        // Busca dados do pedido + cliente para exibir na tela de contato
+237:        final pedidoDoc = await FirebaseFirestore.instance
+238:            .collection('requests')
+239:            .doc(pedidoId)
+240:            .get();
+241:        final pedidoData = pedidoDoc.data() ?? {};
+242:        final clienteId = pedidoData['clienteId'] as String?;
+244:        Map<String, dynamic> clienteData = {};
+245:        if (clienteId != null && clienteId.isNotEmpty) {
+246:          final clienteDoc = await FirebaseFirestore.instance
+247:              .collection('users')
+248:              .doc(clienteId)
+249:              .get();
+250:          clienteData = clienteDoc.data() ?? {};
+251:        }
+253:        final ruaPedido    = pedidoData['rua'] ?? '';
+254:        final bairroPedido = pedidoData['bairro'] ?? pedidoData['neighborhood'] ?? '';
+255:        final cidadePedido = pedidoData['cidade'] ?? '';
+256:        final estadoPedido = pedidoData['estado'] ?? '';
+257:        final localizacaoPedido = [
+258:          if (ruaPedido.toString().isNotEmpty) ruaPedido,
+259:          if (bairroPedido.toString().isNotEmpty) bairroPedido,
+260:          if (cidadePedido.toString().isNotEmpty)
+261:            estadoPedido.toString().isNotEmpty
+262:                ? '$cidadePedido/$estadoPedido'
+263:                : cidadePedido,
+264:        ].join(', ');
+266:        final lat = pedidoData['latitude'];
+267:        final lng = pedidoData['longitude'];
+268:        final ratingRaw = clienteData['avaliacao'] ?? clienteData['rating'];
+270:        if (!mounted) return;
+271:        await _mostrarDialogContato(
+272:          nome: clienteData['nome'] ?? 'Cliente',
+273:          telefone: clienteData['phone'] ?? clienteData['telefone'] ?? '',
+274:          endereco: localizacaoPedido,
+275:          avaliacao: ratingRaw == null ? null : (ratingRaw as num).toDouble(),
+276:          latitude: lat == null ? null : (lat as num).toDouble(),
+277:          longitude: lng == null ? null : (lng as num).toDouble(),
+278:          chatId: chatFinal,
+279:        );
+280:      } else {
+281:        throw Exception(data['message'] ?? 'Falha ao desbloquear.');
+282:      }
+283:    } catch (e) {
+284:      if (mounted) {
+285:        ScaffoldMessenger.of(context).showSnackBar(
+286:          SnackBar(
+287:            content: Text('Erro: $e'),
+288:            backgroundColor: Colors.red.shade700,
+289:          ),
+290:        );
+291:      }
+292:    } finally {
+293:      if (mounted) setState(() => _processandoPedidos.remove(pedidoId));
+294:    }
+295:  }
+297:  // ─── Estrelas de avaliação ──────────────────────────────────────────────────
+298:  Widget _buildEstrelas(double avaliacao) {
+299:    final estrelasCheias = avaliacao.floor();
+300:    final temMeia = (avaliacao - estrelasCheias) >= 0.5;
+301:    return Row(
+302:      mainAxisSize: MainAxisSize.min,
+303:      children: [
+304:        for (int i = 0; i < 5; i++)
+305:          Icon(
+306:            i < estrelasCheias
+307:                ? Icons.star_rounded
+308:                : (i == estrelasCheias && temMeia
+309:                    ? Icons.star_half_rounded
+310:                    : Icons.star_border_rounded),
+311:            size: 16,
+312:            color: _premiumGold,
+313:          ),
+314:        const SizedBox(width: 6),
+315:        Text(
+316:          avaliacao.toStringAsFixed(1).replaceAll('.', ','),
+317:          style: const TextStyle(
+318:              fontSize: 13, fontWeight: FontWeight.w700, color: _black),
+319:        ),
+320:      ],
+321:    );
+322:  }
+324:  // ─── Dialog de contato do cliente (exibido após desbloquear) ───────────────
+325:  Future<void> _mostrarDialogContato({
+326:    required String nome,
+327:    required String telefone,
+328:    required String endereco,
+329:    required String chatId,
+330:    double? avaliacao,
+331:    double? latitude,
+332:    double? longitude,
+333:  }) {
+334:    return showDialog(
+335:      context: context,
+336:      barrierDismissible: false,
+337:      builder: (ctx) => Dialog(
+338:        shape: RoundedRectangleBorder(
+339:            borderRadius: BorderRadius.circular(24)),
+340:        child: Padding(
+341:          padding: const EdgeInsets.all(24),
+342:          child: Column(
+343:            mainAxisSize: MainAxisSize.min,
+344:            crossAxisAlignment: CrossAxisAlignment.start,
+345:            children: [
+346:              // Cabeçalho: ícone de sucesso + título
+347:              Row(
+348:                children: [
+349:                  Container(
+350:                    padding: const EdgeInsets.all(10),
+351:                    decoration: BoxDecoration(
+352:                      color: const Color.fromRGBO(52, 199, 89, 0.12),
+353:                      borderRadius: BorderRadius.circular(12),
+354:                    ),
+355:                    child: const Icon(Icons.check_circle,
+356:                        color: _verified, size: 26),
+357:                  ),
+358:                  const SizedBox(width: 12),
+359:                  const Expanded(
+360:                    child: Text(
+361:                      'Contato desbloqueado!',
+362:                      style: TextStyle(
+363:                          fontSize: 16,
+364:                          fontWeight: FontWeight.w700,
+365:                          color: _black),
+366:                    ),
+367:                  ),
+368:                ],
+369:              ),
+370:              const SizedBox(height: 20),
+372:              // Nome do cliente + selo de verificado
+373:              const Text('Cliente',
+374:                  style: TextStyle(
+375:                      fontSize: 12,
+376:                      color: _textSecondary,
+377:                      fontWeight: FontWeight.w600)),
+378:              const SizedBox(height: 4),
+379:              Row(
+380:                children: [
+381:                  Flexible(
+382:                    child: Text(nome,
+383:                        style: const TextStyle(
+384:                            fontSize: 16,
+385:                            fontWeight: FontWeight.w700,
+386:                            color: _black),
+387:                        maxLines: 2,
+388:                        overflow: TextOverflow.ellipsis),
+389:                  ),
+390:                  const SizedBox(width: 6),
+391:                  const Icon(Icons.verified_rounded,
+392:                      size: 17, color: _accent),
+393:                ],
+394:              ),
+395:              const SizedBox(height: 4),
+396:              Row(
+397:                children: const [
+398:                  Icon(Icons.check_circle_outline,
+399:                      size: 13, color: _textSecondary),
+400:                  SizedBox(width: 4),
+401:                  Text('Cliente verificado',
+402:                      style: TextStyle(
+403:                          fontSize: 12,
+404:                          color: _textSecondary,
+405:                          fontWeight: FontWeight.w500)),
+406:                ],
+407:              ),
+409:              // Avaliação (só aparece se houver dado salvo)
+410:              if (avaliacao != null) ...[
+411:                const SizedBox(height: 10),
+412:                _buildEstrelas(avaliacao),
+413:              ],
+415:              const SizedBox(height: 16),
+417:              // Telefone
+418:              if (telefone.isNotEmpty) ...[
+419:                Row(
+420:                  children: [
+421:                    const Icon(Icons.phone, size: 16, color: _accent),
+422:                    const SizedBox(width: 8),
+423:                    Expanded(
+424:                      child: SelectableText(telefone,
+425:                          style: const TextStyle(
+426:                              fontSize: 15, fontWeight: FontWeight.w600)),
+427:                    ),
+428:                  ],
+429:                ),
+430:                const SizedBox(height: 10),
+431:              ],
+433:              // Endereço — agora com Expanded para quebrar linha corretamente
+434:              if (endereco.isNotEmpty) ...[
+435:                Row(
+436:                  crossAxisAlignment: CrossAxisAlignment.start,
+437:                  children: [
+438:                    const Padding(
+439:                      padding: EdgeInsets.only(top: 2),
+440:                      child: Icon(Icons.location_on_outlined,
+441:                          size: 16, color: _accent),
+442:                    ),
+443:                    const SizedBox(width: 8),
+444:                    Expanded(
+445:                      child: Text(
+446:                        endereco,
+447:                        style: const TextStyle(fontSize: 14, height: 1.3),
+448:                        maxLines: 3,
+449:                        overflow: TextOverflow.ellipsis,
+450:                      ),
+451:                    ),
+452:                  ],
+453:                ),
+454:                const SizedBox(height: 16),
+455:              ],
+457:              Container(height: 1, color: const Color(0xFFEFEFF2)),
+458:              const SizedBox(height: 12),
+460:              // Linha do desconto
+461:              Row(
+462:                children: [
+463:                  const Icon(Icons.account_balance_wallet_outlined,
+464:                      size: 16, color: _textSecondary),
+465:                  const SizedBox(width: 8),
+466:                  const Expanded(
+467:                    child: Text(
+468:                      'R\$ 1,00 descontado do saldo',
+469:                      style: TextStyle(
+470:                          fontSize: 12.5,
+471:                          color: _textSecondary,
+472:                          fontWeight: FontWeight.w500),
+473:                    ),
+474:                  ),
+475:                ],
+476:              ),
+477:              const SizedBox(height: 20),
+479:              // Botão: Conversar com o cliente
+480:              SizedBox(
+481:                width: double.infinity,
+482:                height: 48,
+483:                child: ElevatedButton(
+484:                  onPressed: () {
+485:                    Navigator.pop(ctx);
+486:                    Navigator.push(
+487:                      context,
+488:                      MaterialPageRoute(
+489:                          builder: (_) => ChatPage(chatId: chatId)),
+490:                    );
+491:                  },
+492:                  style: ElevatedButton.styleFrom(
+493:                    backgroundColor: _black,
+494:                    shape: RoundedRectangleBorder(
+495:                        borderRadius: BorderRadius.circular(12)),
+496:                  ),
+497:                  child: const Row(
+498:                    mainAxisAlignment: MainAxisAlignment.center,
+499:                    children: [
+500:                      Icon(Icons.chat_bubble_outline_rounded,
+501:                          size: 17, color: _white),
+502:                      SizedBox(width: 8),
+503:                      Text('Conversar com o cliente',
+504:                          style: TextStyle(
+505:                              color: _white,
+506:                              fontSize: 14.5,
+507:                              fontWeight: FontWeight.w700)),
+508:                    ],
+509:                  ),
+510:                ),
+511:              ),
+512:              const SizedBox(height: 10),
+514:              // Botão: Ver localização
+515:              SizedBox(
+516:                width: double.infinity,
+517:                height: 48,
+518:                child: OutlinedButton(
+519:                  onPressed: endereco.isEmpty && latitude == null
+520:                      ? null
+521:                      : () => _abrirLocalizacao(
+522:                            lat: latitude,
+523:                            lng: longitude,
+524:                            endereco: endereco,
+525:                          ),
+526:                  style: OutlinedButton.styleFrom(
+527:                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+528:                    shape: RoundedRectangleBorder(
+529:                        borderRadius: BorderRadius.circular(12)),
+530:                  ),
+531:                  child: const Row(
+532:                    mainAxisAlignment: MainAxisAlignment.center,
+533:                    children: [
+534:                      Icon(Icons.map_outlined, size: 17, color: _black),
+535:                      SizedBox(width: 8),
+536:                      Text('Ver localização',
+537:                          style: TextStyle(
+538:                              color: _black,
+539:                              fontSize: 14.5,
+540:                              fontWeight: FontWeight.w700)),
+541:                    ],
+542:                  ),
+543:                ),
+544:              ),
+545:            ],
+546:          ),
+547:        ),
+548:      ),
+549:    );
+550:  }
+552:  // ─── Build ─────────────────────────────────────────────────────────────────
+553:  @override
+554:  Widget build(BuildContext context) {
+555:    final user = FirebaseAuth.instance.currentUser;
+557:    if (user == null) {
+558:      return const Scaffold(body: Center(child: Text('Não logado')));
+559:    }
+561:    return Scaffold(
+562:      backgroundColor: _surface,
+563:      appBar: _buildAppBar(),
+564:      body: Column(
+565:        children: [
+566:          _buildSaldoBanner(user),
+567:          Padding(
+568:            padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+569:            child: Row(
+570:              crossAxisAlignment: CrossAxisAlignment.start,
+571:              children: [
+572:                Container(
+573:                  margin: const EdgeInsets.only(top: 6, right: 8),
+574:                  width: 8,
+575:                  height: 8,
+576:                  decoration: const BoxDecoration(
+577:                    color: _accent,
+578:                    shape: BoxShape.circle,
+579:                  ),
+580:                ),
+581:                const Expanded(
+582:                  child: Column(
+583:                    crossAxisAlignment: CrossAxisAlignment.start,
+584:                    children: [
+585:                      Text(
+586:                        'Pedidos disponíveis',
+587:                        style: TextStyle(
+588:                            fontSize: 19,
+589:                            fontWeight: FontWeight.w800,
+590:                            color: _black,
+591:                            letterSpacing: -0.3),
+592:                      ),
+593:                      SizedBox(height: 2),
+594:                      Text(
+595:                        'Novos serviços na sua região',
+596:                        style: TextStyle(
+597:                            fontSize: 12.5, color: _textSecondary),
+598:                      ),
+599:                    ],
+600:                  ),
+601:                ),
+602:                _buildFiltrarButton(),
+603:              ],
+604:            ),
+605:          ),
+606:          Expanded(child: _buildListaPedidos(user)),
+607:        ],
+608:      ),
+609:    );
+610:  }
+612:  // ─── Botão "Filtrar" ───────────────────────────────────────────────────────
+613:  Widget _buildFiltrarButton() {
+614:    return InkWell(
+615:      borderRadius: BorderRadius.circular(12),
+616:      onTap: () {
+617:        ScaffoldMessenger.of(context).showSnackBar(
+618:          const SnackBar(
+619:            content: Text('Filtros chegando em breve ✨'),
+620:            behavior: SnackBarBehavior.floating,
+621:          ),
+622:        );
+623:      },
+624:      child: Container(
+625:        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+626:        decoration: BoxDecoration(
+627:          color: _white,
+628:          borderRadius: BorderRadius.circular(12),
+629:          border: Border.all(color: const Color(0xFFE5E7EB)),
+630:          boxShadow: [
+631:            BoxShadow(
+632:              color: const Color.fromRGBO(0, 0, 0, 0.04),
+633:              blurRadius: 6,
+634:              offset: const Offset(0, 2),
+635:            ),
+636:          ],
+637:        ),
+638:        child: const Row(
+639:          mainAxisSize: MainAxisSize.min,
+640:          children: [
+641:            Text('Filtrar',
+642:                style: TextStyle(
+643:                    fontSize: 13.5,
+644:                    fontWeight: FontWeight.w700,
+645:                    color: _black)),
+646:            SizedBox(width: 6),
+647:            Icon(Icons.tune_rounded, size: 16, color: _black),
+648:          ],
+649:        ),
+650:      ),
+651:    );
+652:  }
+654:  // ─── AppBar ────────────────────────────────────────────────────────────────
+655:  PreferredSizeWidget _buildAppBar() {
+656:    return AppBar(
+657:      backgroundColor: _navyDark,
+658:      foregroundColor: _white,
+659:      elevation: 0,
+660:      titleSpacing: 12,
+661:      leading: const Padding(
+662:        padding: EdgeInsets.only(left: 16),
+663:        child: Icon(Icons.menu_rounded, size: 22),
+664:      ),
+665:      leadingWidth: 46,
+666:      title: const Row(
+667:        crossAxisAlignment: CrossAxisAlignment.center,
+668:        children: [
+669:          Text(
+670:            'Conecta',
+671:            style: TextStyle(
+672:                fontWeight: FontWeight.w800,
+673:                fontSize: 19,
+674:                letterSpacing: -0.3,
+675:                color: _white),
+676:          ),
+677:          Text(
+678:            'Pro',
+679:            style: TextStyle(
+680:                fontWeight: FontWeight.w800,
+681:                fontSize: 19,
+682:                letterSpacing: -0.3,
+683:                color: _accent),
+684:          ),
+685:        ],
+686:      ),
+687:      actions: [
+688:        IconButton(
+689:          icon: const Icon(Icons.history_rounded, size: 22),
+690:          tooltip: 'Histórico',
+691:          onPressed: () => Navigator.push(
+692:            context,
+693:            MaterialPageRoute(builder: (_) => HistoricoServicosPage()),
+694:          ),
+695:        ),
+696:        IconButton(
+697:          icon: const Icon(Icons.work_outline_rounded, size: 22),
+698:          tooltip: 'Meus serviços',
+699:          onPressed: () => Navigator.push(
+700:            context,
+701:            MaterialPageRoute(builder: (_) => MeusServicosPage()),
+702:          ),
+703:        ),
+704:        // ✅ Abre PixDialog sem valor — profissional digita o valor lá dentro
+705:        Stack(
+706:          clipBehavior: Clip.none,
+707:          children: [
+708:            IconButton(
+709:              icon: const Icon(Icons.account_balance_wallet_outlined, size: 22),
+710:              tooltip: 'Adicionar saldo',
+711:              onPressed: () => showDialog(
+712:                context: context,
+713:                builder: (_) => const PixDialog(),
+714:              ),
+715:            ),
+716:            Positioned(
+717:              top: 9,
+718:              right: 9,
+719:              child: Container(
+720:                width: 8,
+721:                height: 8,
+722:                decoration: BoxDecoration(
+723:                  color: _accent,
+724:                  shape: BoxShape.circle,
+725:                  border: Border.all(color: _navyDark, width: 1.5),
+726:                ),
+727:              ),
+728:            ),
+729:          ],
+730:        ),
+731:        IconButton(
+732:          icon: const Icon(Icons.person_outline_rounded, size: 22),
+733:          tooltip: 'Meu perfil',
+734:          onPressed: () => Navigator.push(
+735:            context,
+736:            MaterialPageRoute(builder: (_) => const MeuPerfilProfissionalPage()),
+737:          ),
+738:        ),
+739:        IconButton(
+740:          icon: const Icon(Icons.help_outline_rounded, size: 22),
+741:          tooltip: 'Ajuda',
+742:          onPressed: _abrirSuporte,
+743:        ),
+744:        IconButton(
+745:          icon: const Icon(Icons.logout_rounded, size: 22),
+746:          tooltip: 'Sair',
+747:          onPressed: () async {
+748:            await FirebaseAuth.instance.signOut();
+749:            if (!mounted) return;
+750:            Navigator.of(context).pushAndRemoveUntil(
+751:              MaterialPageRoute(builder: (_) => const AuthCheck()),
+752:              (route) => false,
+753:            );
+754:          },
+755:        ),
+756:        const SizedBox(width: 4),
+757:      ],
+758:    );
+759:  }
+761:  // ─── Banner de saldo (cartão premium com gradiente) ─────────────────────────
+762:  Widget _buildSaldoBanner(User user) {
+763:    return StreamBuilder<DocumentSnapshot>(
+764:      stream: FirebaseFirestore.instance
+765:          .collection('users')
+766:          .doc(user.uid)
+767:          .snapshots(),
+768:      builder: (context, snap) {
+769:        double saldo = 0;
+770:        if (snap.hasData && snap.data!.exists) {
+771:          final d = snap.data!.data() as Map<String, dynamic>;
+772:          saldo = ((d['balance'] ?? 0) as num).toDouble();
+773:        }
+774:        return Container(
+775:          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+776:          decoration: BoxDecoration(
+777:            gradient: const LinearGradient(
+778:              begin: Alignment.topLeft,
+779:              end: Alignment.bottomRight,
+780:              colors: [_navyDark, _navyLight],
+781:            ),
+782:            borderRadius: BorderRadius.circular(24),
+783:            boxShadow: [
+784:              BoxShadow(
+785:                color: const Color.fromRGBO(10, 10, 20, 0.25),
+786:                blurRadius: 20,
+787:                offset: const Offset(0, 10),
+788:              ),
+789:            ],
+790:          ),
+791:          child: ClipRRect(
+792:            borderRadius: BorderRadius.circular(24),
+793:            child: Stack(
+794:              children: [
+795:                // Decoração: círculos translúcidos
+796:                Positioned(
+797:                  right: -30,
+798:                  top: -30,
+799:                  child: Container(
+800:                    width: 130,
+801:                    height: 130,
+802:                    decoration: BoxDecoration(
+803:                      shape: BoxShape.circle,
+804:                      border: Border.all(
+805:                          color: const Color.fromRGBO(255, 255, 255, 0.06),
+806:                          width: 18),
+807:                    ),
+808:                  ),
+809:                ),
+810:                Positioned(
+811:                  right: 10,
+812:                  top: 40,
+813:                  child: Container(
+814:                    width: 70,
+815:                    height: 70,
+816:                    decoration: BoxDecoration(
+817:                      shape: BoxShape.circle,
+818:                      border: Border.all(
+819:                          color: const Color.fromRGBO(255, 255, 255, 0.05),
+820:                          width: 10),
+821:                    ),
+822:                  ),
+823:                ),
+824:                Padding(
+825:                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+826:                  child: Column(
+827:                    crossAxisAlignment: CrossAxisAlignment.start,
+828:                    children: [
+829:                      Row(
+830:                        crossAxisAlignment: CrossAxisAlignment.start,
+831:                        children: [
+832:                          Container(
+833:                            width: 52,
+834:                            height: 52,
+835:                            decoration: BoxDecoration(
+836:                              color: _accent,
+837:                              borderRadius: BorderRadius.circular(16),
+838:                            ),
+839:                            child: const Icon(Icons.account_balance_wallet_rounded,
+840:                                color: _white, size: 26),
+841:                          ),
+842:                          const SizedBox(width: 14),
+843:                          Expanded(
+844:                            child: Column(
+845:                              crossAxisAlignment: CrossAxisAlignment.start,
+846:                              children: [
+847:                                const Text(
+848:                                  'Seu saldo disponível',
+849:                                  style: TextStyle(
+850:                                      color: Color(0xFFB8BAC9),
+851:                                      fontSize: 13,
+852:                                      fontWeight: FontWeight.w500),
+853:                                ),
+854:                                const SizedBox(height: 2),
+855:                                Text(
+856:                                  'R\$ ${saldo.toStringAsFixed(2).replaceAll('.', ',')}',
+857:                                  style: const TextStyle(
+858:                                      color: _white,
+859:                                      fontSize: 28,
+860:                                      fontWeight: FontWeight.w800,
+861:                                      letterSpacing: -0.5),
+862:                                ),
+863:                              ],
+864:                            ),
+865:                          ),
+866:                        ],
+867:                      ),
+868:                      const SizedBox(height: 16),
+869:                      InkWell(
+870:                        borderRadius: BorderRadius.circular(24),
+871:                        onTap: () => showDialog(
+872:                          context: context,
+873:                          builder: (_) => const PixDialog(),
+874:                        ),
+875:                        child: Container(
+876:                          padding: const EdgeInsets.symmetric(
+877:                              horizontal: 18, vertical: 11),
+878:                          decoration: BoxDecoration(
+879:                            color: _accent,
+880:                            borderRadius: BorderRadius.circular(24),
+881:                          ),
+882:                          child: const Row(
+883:                            mainAxisSize: MainAxisSize.min,
+884:                            children: [
+885:                              Text(
+886:                                'Adicionar saldo',
+887:                                style: TextStyle(
+888:                                    color: _white,
+889:                                    fontSize: 14,
+890:                                    fontWeight: FontWeight.w700),
+891:                              ),
+892:                              SizedBox(width: 6),
+893:                              Icon(Icons.add_circle_rounded,
+894:                                  color: _white, size: 18),
+895:                            ],
+896:                          ),
+897:                        ),
+898:                      ),
+899:                      const SizedBox(height: 18),
+900:                      Container(
+901:                        height: 1,
+902:                        color: const Color.fromRGBO(255, 255, 255, 0.08),
+903:                      ),
+904:                      const SizedBox(height: 16),
+905:                      Row(
+906:                        children: [
+907:                          Container(
+908:                            width: 40,
+909:                            height: 40,
+910:                            decoration: BoxDecoration(
+911:                              color: const Color.fromRGBO(255, 201, 77, 0.15),
+912:                              borderRadius: BorderRadius.circular(12),
+913:                            ),
+914:                            child: const Icon(Icons.diamond_rounded,
+915:                                color: _premiumGold, size: 20),
+916:                          ),
+917:                          const SizedBox(width: 12),
+918:                          const Expanded(
+919:                            child: Column(
+920:                              crossAxisAlignment: CrossAxisAlignment.start,
+921:                              children: [
+922:                                Text(
+923:                                  'Carteira Premium',
+924:                                  style: TextStyle(
+925:                                      color: _white,
+926:                                      fontSize: 14,
+927:                                      fontWeight: FontWeight.w700),
+928:                                ),
+929:                                SizedBox(height: 2),
+930:                                Text(
+931:                                  'Desbloqueie contatos e conquiste mais serviços!',
+932:                                  style: TextStyle(
+933:                                      color: Color(0xFFB8BAC9),
+934:                                      fontSize: 11.5,
+935:                                      height: 1.3),
+936:                                ),
+937:                              ],
+938:                            ),
+939:                          ),
+940:                        ],
+941:                      ),
+942:                    ],
+943:                  ),
+944:                ),
+945:              ],
+946:            ),
+947:          ),
+948:        );
+949:      },
+950:    );
+951:  }
+953:  // ─── Lista de pedidos ──────────────────────────────────────────────────────
+954:  Widget _buildListaPedidos(User user) {
+955:    return StreamBuilder<QuerySnapshot>(
+956:      stream: FirebaseFirestore.instance
+957:          .collection('requests')
+958:          .where('status', isEqualTo: 'aberto')
+959:          .orderBy('criadoEm', descending: true)
+960:          .snapshots(),
+961:      builder: (context, snap) {
+962:        if (snap.connectionState == ConnectionState.waiting) {
+963:          return const Center(
+964:              child: CircularProgressIndicator(color: _accent));
+965:        }
+967:        if (snap.hasError) {
+968:          return Center(
+969:              child: Text('Erro: ${snap.error}',
+970:                  style: const TextStyle(color: Colors.red)));
+971:        }
+973:        final docs = snap.data?.docs ?? [];
+975:        // Verifica se o profissional já tem serviço ativo
+976:        final temServicoAtivo = docs.any((d) {
+977:          final data = d.data() as Map<String, dynamic>;
+978:          return data['providerId'] == user.uid &&
+979:              data['status'] == 'aceito';
+980:        });
+982:        // Filtra apenas pedidos sem profissional
+983:        final pedidos = docs.where((d) {
+984:          final data = d.data() as Map<String, dynamic>;
+985:          return data['providerId'] == null ||
+986:              (data['providerId'] as String).isEmpty;
+987:        }).toList();
+989:        if (pedidos.isEmpty) {
+990:          return Center(
+991:            child: Column(
+992:              mainAxisSize: MainAxisSize.min,
+993:              children: [
+994:                Container(
+995:                  width: 84,
+996:                  height: 84,
+997:                  decoration: BoxDecoration(
+998:                    color: const Color(0xFFEDEFF5),
+999:                    shape: BoxShape.circle,
+1000:                  ),
+1001:                  child: const Icon(Icons.inbox_outlined,
+1002:                      size: 38, color: _textSecondary),
+1003:                ),
+1004:                const SizedBox(height: 16),
+1005:                const Text('Nenhum pedido disponível',
+1006:                    style: TextStyle(
+1007:                        fontSize: 16,
+1008:                        color: _black,
+1009:                        fontWeight: FontWeight.w700)),
+1010:                const SizedBox(height: 4),
+1011:                const Text('Novos pedidos aparecerão aqui automaticamente.',
+1012:                    style: TextStyle(fontSize: 13, color: _textSecondary)),
+1013:              ],
+1014:            ),
+1015:          );
+1016:        }
+1018:        return RefreshIndicator(
+1019:          color: _accent,
+1020:          onRefresh: () async => setState(() {}),
+1021:          child: ListView.separated(
+1022:            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+1023:            itemCount: pedidos.length,
+1024:            separatorBuilder: (_, __) => const SizedBox(height: 14),
+1025:            itemBuilder: (context, index) {
+1026:              final doc  = pedidos[index];
+1027:              final data = doc.data() as Map<String, dynamic>;
+1028:              // Registra visualização assim que o card é renderizado na lista
+1029:              _registrarVisualizacao(doc.id);
+1030:              return _buildCardPedido(
+1031:                  doc.id, data, temServicoAtivo);
+1032:            },
+1033:          ),
+1034:        );
+1035:      },
+1036:    );
+1037:  }
+1039:  // ─── Formata "há X min / X h / X d" a partir do Timestamp ──────────────────
+1040:  String _tempoDecorrido(dynamic criadoEm) {
+1041:    if (criadoEm == null || criadoEm is! Timestamp) return '';
+1042:    final dt = criadoEm.toDate();
+1043:    final diff = DateTime.now().difference(dt);
+1044:    if (diff.inMinutes < 1) return 'agora mesmo';
+1045:    if (diff.inMinutes < 60) return 'há ${diff.inMinutes} min';
+1046:    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+1047:    return 'há ${diff.inDays}d';
+1048:  }
+1050:  // ─── Calcula distância (em km) entre o profissional e o pedido ────────────
+1051:  String? _formatarDistancia(Map<String, dynamic> data) {
+1052:    if (_minhaLat == null || _minhaLng == null) return null;
+1053:    final lat = data['latitude'];
+1054:    final lng = data['longitude'];
+1055:    if (lat == null || lng == null) return null;
+1057:    final distanciaMetros = Geolocator.distanceBetween(
+1058:      _minhaLat!,
+1059:      _minhaLng!,
+1060:      (lat as num).toDouble(),
+1061:      (lng as num).toDouble(),
+1062:    );
+1063:    final km = distanciaMetros / 1000;
+1064:    return '${km.toStringAsFixed(km < 10 ? 1 : 0).replaceAll('.', ',')} km';
+1065:  }
+1067:  // ─── Card de pedido ────────────────────────────────────────────────────────
+1068:  Widget _buildCardPedido(
+1069:      String pedidoId, Map<String, dynamic> data, bool temServicoAtivo) {
+1070:    final titulo    = data['titulo'] ?? data['title'] ?? 'Serviço sem título';
+1071:    final descricao = data['descricao'] ?? data['description'] ?? '';
+1072:    final categoria = (data['categoria'] ?? data['category'] ?? '').toString();
+1073:    final bairro    = data['bairro'] ?? data['neighborhood'] ?? '';
+1074:    final cidade    = data['cidade'] ?? '';
+1075:    final estado    = data['estado'] ?? '';
+1076:    final localizacao = [
+1077:      if (bairro.toString().isNotEmpty) bairro,
+1078:      if (cidade.toString().isNotEmpty)
+1079:        estado.toString().isNotEmpty ? '$cidade/$estado' : cidade,
+1080:    ].join(', ');
+1081:    final chatId    = data['chatId'] as String?;
+1082:    final isProcessando = _processandoPedidos.contains(pedidoId);
+1083:    final isFavorito = _favoritos.contains(pedidoId);
+1085:    final tempo = _tempoDecorrido(data['criadoEm']);
+1086:    final distancia = _formatarDistancia(data);
+1087:    final recente = _isRecente(data['criadoEm']);
+1089:    final valorMin = data['valorEstimadoMin'];
+1090:    final valorMax = data['valorEstimadoMax'];
+1091:    final temValorEstimado = valorMin != null && valorMax != null;
+1093:    final visualizacoes = ((data['visualizacoes'] ?? 0) as num).toInt();
+1095:    final estilo = _categoriaEstilo(categoria);
+1096:    final Color corCategoria = estilo['cor'] as Color;
+1097:    final IconData iconeCategoria = estilo['icone'] as IconData;
+1099:    return Container(
+1100:      decoration: BoxDecoration(
+1101:        color: _white,
+1102:        borderRadius: BorderRadius.circular(18),
+1103:        boxShadow: [
+1104:          BoxShadow(
+1105:            color: const Color.fromRGBO(15, 15, 30, 0.06),
+1106:            blurRadius: 16,
+1107:            offset: const Offset(0, 6),
+1108:          ),
+1109:        ],
+1110:      ),
+1111:      clipBehavior: Clip.antiAlias,
+1112:      child: IntrinsicHeight(
+1113:        child: Row(
+1114:          crossAxisAlignment: CrossAxisAlignment.stretch,
+1115:          children: [
+1116:            // Barra colorida lateral indicando a categoria
+1117:            Container(width: 4, color: corCategoria),
+1118:            Expanded(
+1119:              child: Column(
+1120:                crossAxisAlignment: CrossAxisAlignment.start,
+1121:                children: [
+1122:                  // Cabeçalho
+1123:                  Padding(
+1124:                    padding: const EdgeInsets.fromLTRB(14, 16, 12, 8),
+1125:                    child: Row(
+1126:                      crossAxisAlignment: CrossAxisAlignment.start,
+1127:                      children: [
+1128:                        Container(
+1129:                          width: 46,
+1130:                          height: 46,
+1131:                          decoration: BoxDecoration(
+1132:                            color: corCategoria,
+1133:                            borderRadius: BorderRadius.circular(13),
+1134:                          ),
+1135:                          child: Icon(iconeCategoria, color: _white, size: 24),
+1136:                        ),
+1137:                        const SizedBox(width: 12),
+1138:                        Expanded(
+1139:                          child: Column(
+1140:                            crossAxisAlignment: CrossAxisAlignment.start,
+1141:                            children: [
+1142:                              Text(
+1143:                                titulo,
+1144:                                style: const TextStyle(
+1145:                                    fontSize: 15.5,
+1146:                                    fontWeight: FontWeight.w700,
+1147:                                    color: _black),
+1148:                                maxLines: 1,
+1149:                                overflow: TextOverflow.ellipsis,
+1150:                              ),
+1151:                              if (categoria.isNotEmpty) ...[
+1152:                                const SizedBox(height: 4),
+1153:                                Container(
+1154:                                  padding: const EdgeInsets.symmetric(
+1155:                                      horizontal: 8, vertical: 3),
+1156:                                  decoration: BoxDecoration(
+1157:                                    color: corCategoria.withOpacity(0.10),
+1158:                                    borderRadius: BorderRadius.circular(8),
+1159:                                  ),
+1160:                                  child: Text(categoria,
+1161:                                      style: TextStyle(
+1162:                                          fontSize: 11,
+1163:                                          color: corCategoria,
+1164:                                          fontWeight: FontWeight.w700)),
+1165:                                ),
+1166:                              ],
+1167:                            ],
+1168:                          ),
+1169:                        ),
+1170:                        if (recente) ...[
+1171:                          Container(
+1172:                            padding: const EdgeInsets.symmetric(
+1173:                                horizontal: 9, vertical: 4),
+1174:                            decoration: BoxDecoration(
+1175:                              color: const Color.fromRGBO(47, 111, 237, 0.10),
+1176:                              borderRadius: BorderRadius.circular(20),
+1177:                            ),
+1178:                            child: const Text('Novo',
+1179:                                style: TextStyle(
+1180:                                    fontSize: 11,
+1181:                                    color: _accent,
+1182:                                    fontWeight: FontWeight.w700)),
+1183:                          ),
+1184:                          const SizedBox(width: 4),
+1185:                        ],
+1186:                        InkWell(
+1187:                          borderRadius: BorderRadius.circular(20),
+1188:                          onTap: () {
+1189:                            setState(() {
+1190:                              if (isFavorito) {
+1191:                                _favoritos.remove(pedidoId);
+1192:                              } else {
+1193:                                _favoritos.add(pedidoId);
+1194:                              }
+1195:                            });
+1196:                          },
+1197:                          child: Padding(
+1198:                            padding: const EdgeInsets.all(4),
+1199:                            child: Icon(
+1200:                              isFavorito
+1201:                                  ? Icons.favorite_rounded
+1202:                                  : Icons.favorite_border_rounded,
+1203:                              size: 20,
+1204:                              color: isFavorito
+1205:                                  ? const Color(0xFFEF4444)
+1206:                                  : const Color(0xFFC4C6D0),
+1207:                            ),
+1208:                          ),
+1209:                        ),
+1210:                      ],
+1211:                    ),
+1212:                  ),
+1214:                  // Linha: localização (bairro, cidade/estado) + tempo decorrido
+1215:                  if (localizacao.isNotEmpty || tempo.isNotEmpty)
+1216:                    Padding(
+1217:                      padding:
+1218:                          EdgeInsets.fromLTRB(14, 0, 14, distancia != null ? 2 : 8),
+1219:                      child: Row(
+1220:                        children: [
+1221:                          if (localizacao.isNotEmpty) ...[
+1222:                            const Icon(Icons.location_on_outlined,
+1223:                                size: 13, color: _textSecondary),
+1224:                            const SizedBox(width: 2),
+1225:                            Expanded(
+1226:                              child: Text(localizacao,
+1227:                                  style: const TextStyle(
+1228:                                      fontSize: 12, color: _textSecondary),
+1229:                                  maxLines: 1,
+1230:                                  overflow: TextOverflow.ellipsis),
+1231:                            ),
+1232:                          ],
+1233:                          if (localizacao.isNotEmpty && tempo.isNotEmpty)
+1234:                            const Text('  ·  ',
+1235:                                style: TextStyle(
+1236:                                    fontSize: 12, color: _textSecondary)),
+1237:                          if (tempo.isNotEmpty)
+1238:                            Text(tempo,
+1239:                                style: const TextStyle(
+1240:                                    fontSize: 12, color: _textSecondary)),
+1241:                        ],
+1242:                      ),
+1243:                    ),
+1245:                  // Linha: distância até o profissional
+1246:                  if (distancia != null)
+1247:                    Padding(
+1248:                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+1249:                      child: Row(
+1250:                        children: [
+1251:                          const Icon(Icons.directions_car_filled_outlined,
+1252:                              size: 13, color: _textSecondary),
+1253:                          const SizedBox(width: 2),
+1254:                          Text(distancia,
+1255:                              style: const TextStyle(
+1256:                                  fontSize: 12, color: _textSecondary)),
+1257:                        ],
+1258:                      ),
+1259:                    ),
+1261:                  const Divider(
+1262:                      color: Color(0xFFEFEFF2), height: 1, indent: 14, endIndent: 14),
+1264:                  if (descricao.isNotEmpty)
+1265:                    Padding(
+1266:                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+1267:                      child: Text(
+1268:                        descricao,
+1269:                        style: const TextStyle(
+1270:                            fontSize: 13.5, color: _textSecondary, height: 1.45),
+1271:                        maxLines: 3,
+1272:                        overflow: TextOverflow.ellipsis,
+1273:                      ),
+1274:                    ),
+1276:                  // Linha: valor estimado + visualizações
+1277:                  if (temValorEstimado || visualizacoes > 0)
+1278:                    Padding(
+1279:                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+1280:                      child: Row(
+1281:                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+1282:                        children: [
+1283:                          if (temValorEstimado)
+1284:                            Text(
+1285:                              'R\$ ${(valorMin as num).toStringAsFixed(0)} - ${(valorMax as num).toStringAsFixed(0)}',
+1286:                              style: const TextStyle(
+1287:                                  fontSize: 14.5,
+1288:                                  fontWeight: FontWeight.w800,
+1289:                                  color: Color(0xFF16A34A)),
+1290:                            )
+1291:                          else
+1292:                            const SizedBox.shrink(),
+1293:                          if (visualizacoes > 0)
+1294:                            Row(
+1295:                              mainAxisSize: MainAxisSize.min,
+1296:                              children: [
+1297:                                const Text('🔥', style: TextStyle(fontSize: 12)),
+1298:                                const SizedBox(width: 3),
+1299:                                Text(
+1300:                                  visualizacoes > 1
+1301:                                      ? '$visualizacoes interessados'
+1302:                                      : '1 interessado',
+1303:                                  style: const TextStyle(
+1304:                                      fontSize: 11.5,
+1305:                                      color: Color(0xFFEA580C),
+1306:                                      fontWeight: FontWeight.w700),
+1307:                                ),
+1308:                              ],
+1309:                            ),
+1310:                        ],
+1311:                      ),
+1312:                    ),
+1314:                  // Aviso serviço ativo
+1315:                  if (temServicoAtivo)
+1316:                    const Padding(
+1317:                      padding: EdgeInsets.fromLTRB(14, 10, 14, 0),
+1318:                      child: Row(
+1319:                        children: [
+1320:                          Icon(Icons.warning_amber_rounded,
+1321:                              size: 14, color: Color(0xFFFF9500)),
+1322:                          SizedBox(width: 6),
+1323:                          Text(
+1324:                            'Finalize seu serviço atual primeiro',
+1325:                            style: TextStyle(
+1326:                                fontSize: 12,
+1327:                                color: Color(0xFFFF9500),
+1328:                                fontWeight: FontWeight.w600),
+1329:                          ),
+1330:                        ],
+1331:                      ),
+1332:                    ),
+1334:                  // Botão aceitar
+1335:                  Padding(
+1336:                    padding: const EdgeInsets.all(14),
+1337:                    child: SizedBox(
+1338:                      width: double.infinity,
+1339:                      height: 50,
+1340:                      child: ElevatedButton(
+1341:                        style: ElevatedButton.styleFrom(
+1342:                          backgroundColor:
+1343:                              temServicoAtivo ? const Color(0xFFCCCCCC) : _black,
+1344:                          shape: RoundedRectangleBorder(
+1345:                              borderRadius: BorderRadius.circular(14)),
+1346:                          elevation: 0,
+1347:                        ),
+1348:                        onPressed: (isProcessando || temServicoAtivo)
+1349:                            ? null
+1350:                            : () => _desbloquearPedido(pedidoId, chatId),
+1351:                        child: isProcessando
+1352:                            ? const SizedBox(
+1353:                                width: 20,
+1354:                                height: 20,
+1355:                                child: CircularProgressIndicator(
+1356:                                    color: _white, strokeWidth: 2),
+1357:                              )
+1358:                            : Row(
+1359:                                mainAxisAlignment: MainAxisAlignment.center,
+1360:                                children: [
+1361:                                  const Icon(Icons.lock_open_rounded,
+1362:                                      size: 18, color: _white),
+1363:                                  const SizedBox(width: 8),
+1364:                                  const Text(
+1365:                                    'Desbloquear contato',
+1366:                                    style: TextStyle(
+1367:                                        color: _white,
+1368:                                        fontSize: 14,
+1369:                                        fontWeight: FontWeight.w700),
+1370:                                  ),
+1371:                                  const SizedBox(width: 6),
+1372:                                  Text(
+1373:                                    'R\$ 1,00',
+1374:                                    style: TextStyle(
+1375:                                        color: _accent.withOpacity(0.9),
+1376:                                        fontSize: 14,
+1377:                                        fontWeight: FontWeight.w800),
+1378:                                  ),
+1379:                                ],
+1380:                              ),
+1381:                      ),
+1382:                    ),
+1383:                  ),
+1384:                ],
+1385:              ),
+1386:            ),
+1387:          ],
+1388:        ),
+1389:      ),
+1390:    );
+1391:  }
+1392:}
