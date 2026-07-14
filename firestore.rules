@@ -18,18 +18,32 @@ service cloud.firestore {
       return logado() && meuRole() == 'admin';
     }
 
+    // Campos que só o backend (Admin SDK, que ignora estas regras) pode
+    // alterar. Impede que o próprio usuário se promova a admin ou edite
+    // o próprio saldo direto pelo SDK do Firestore.
+    function naoMexeuEmCamposProtegidos() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['role', 'balance']);
+    }
+
 
     match /users/{userId} {
 
       allow read: if logado();
 
-      allow create: if souEu(userId);
+      // Impede que o cadastro já nasça com role/balance escolhidos pelo
+      // próprio usuário (ex: role: 'admin' ou balance: 999999 na criação).
+      allow create: if souEu(userId) &&
+        request.resource.data.role in ['cliente', 'profissional'] &&
+        (request.resource.data.balance == 0 || !('balance' in request.resource.data));
 
-      // Permite que o próprio usuário (ou admin) atualize seu perfil livremente.
+      // Permite que o próprio usuário (ou admin) atualize seu perfil livremente,
+      // EXCETO os campos protegidos (role, balance) — esses só o backend altera.
       // Também permite que QUALQUER usuário logado atualize apenas os campos de
       // avaliação (usado ao avaliar um profissional), com validação de tipo e
       // faixa de valor para impedir que alguém force uma nota/selo falsos.
-      allow update: if souAdmin() || souEu(userId) || (
+      allow update: if souAdmin() ||
+        (souEu(userId) && naoMexeuEmCamposProtegidos()) || (
         logado() &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['totalAvaliacoes', 'somaAvaliacoes', 'mediaAvaliacao', 'verificado']) &&
@@ -71,11 +85,31 @@ service cloud.firestore {
 
 
     match /chats/{chatId} {
+      // O chat é sempre criado pelo backend (Admin SDK, que ignora estas
+      // regras) já com clienteId/providerId gravados. O app só lê e faz
+      // pequenas atualizações (ex: campo "typing") — nunca cria do zero.
+      function souParticipante() {
+        return logado() && (
+          resource.data.clienteId == request.auth.uid ||
+          resource.data.providerId == request.auth.uid
+        );
+      }
 
-      allow read, write: if logado();
+      allow read, update: if souParticipante();
+      allow create, delete: if false;
 
       match /messages/{messageId} {
-        allow read, write: if logado();
+        function souParticipanteDoChat() {
+          return logado() && (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.clienteId == request.auth.uid ||
+            get(/databases/$(database)/documents/chats/$(chatId)).data.providerId == request.auth.uid
+          );
+        }
+
+        allow read: if souParticipanteDoChat();
+        allow create: if souParticipanteDoChat() &&
+          request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
       }
     }
 
