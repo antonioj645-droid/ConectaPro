@@ -210,10 +210,15 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         '/carteira/desbloquear',
       );
 
+      final idToken = await user.getIdToken();
+
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': user.uid, 'pedidoId': pedidoId}),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({'pedidoId': pedidoId}),
       );
 
       if (response.statusCode != 200) throw Exception(response.body);
