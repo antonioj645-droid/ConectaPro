@@ -437,7 +437,8 @@ class _AreaClientePageState extends State<AreaClientePage> {
       ),
     );
   }
-// ─── Banner rotativo ─────────────────────────────────────────────────────────
+
+  // ─── Banner rotativo (agora no mesmo padrão navy do card de cima) ───────────
   Widget _buildBannerRotativo() {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -455,48 +456,74 @@ class _AreaClientePageState extends State<AreaClientePage> {
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: _white,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [_navyDark, _navyLight],
+                    ),
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color.fromRGBO(15, 15, 30, 0.06),
+                        color: const Color.fromRGBO(10, 10, 20, 0.25),
                         blurRadius: 16,
-                        offset: const Offset(0, 6),
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _accent.withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(14),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          right: -24,
+                          top: -24,
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: const Color.fromRGBO(255, 255, 255, 0.06),
+                                  width: 14),
+                            ),
+                          ),
                         ),
-                        child: Text(b['emoji']!,
-                            style: const TextStyle(fontSize: 26)),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Row(
                           children: [
-                            Text(b['titulo']!,
-                                style: const TextStyle(
-                                    color: _black,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14.5)),
-                            const SizedBox(height: 3),
-                            Text(b['sub']!,
-                                style: const TextStyle(
-                                    color: _textSecondary, fontSize: 12)),
+                            Container(
+                              width: 52,
+                              height: 52,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: const Color.fromRGBO(255, 255, 255, 0.10),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Text(b['emoji']!,
+                                  style: const TextStyle(fontSize: 26)),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(b['titulo']!,
+                                      style: const TextStyle(
+                                          color: _white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14.5)),
+                                  const SizedBox(height: 3),
+                                  Text(b['sub']!,
+                                      style: const TextStyle(
+                                          color: Color(0xFFB8BAC9),
+                                          fontSize: 12)),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               },
