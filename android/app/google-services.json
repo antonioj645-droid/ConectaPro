@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "409724060713-de626g2afmufah4ofunqqtht4ua861ne.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.conectapro.app",
+            "certificate_hash": "33d47e240ec7d20b2947926f60aba7dcb2d126d0"
+          }
+        },
+        {
           "client_id": "409724060713-j7vs4joeo0d56dee0er0bn512r7673hg.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -63,6 +71,14 @@
           "android_info": {
             "package_name": "com.example.conectapro",
             "certificate_hash": "5ffef6decbfe690839e3b668b67a6d314b46a620"
+          }
+        },
+        {
+          "client_id": "409724060713-dssjd74j09ukv1dr3pmoat7gge593cq4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.conectapro",
+            "certificate_hash": "33d47e240ec7d20b2947926f60aba7dcb2d126d0"
           }
         },
         {

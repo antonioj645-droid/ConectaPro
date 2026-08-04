@@ -5,26 +5,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
-/// Máscara de moeda BR: usuário digita só números e o app monta
-/// "1.500,00" sozinho, sem risco de confundir milhar com decimal.
 class _MoedaBrFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
     var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) {
-      return const TextEditingValue(text: '');
-    }
-    // Interpreta os últimos 2 dígitos como centavos
+    if (digits.isEmpty) return const TextEditingValue(text: '');
     final valorCentavos = int.parse(digits);
-    final reais = valorCentavos ~/ 100;
+    final reais    = valorCentavos ~/ 100;
     final centavos = valorCentavos % 100;
-
     final reaisFormatado = reais.toString().replaceAllMapped(
         RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.');
-
     final texto = '$reaisFormatado,${centavos.toString().padLeft(2, '0')}';
-
     return TextEditingValue(
       text: texto,
       selection: TextSelection.collapsed(offset: texto.length),
@@ -80,7 +72,6 @@ class _ChatPageState extends State<ChatPage> {
         'isRead':    false,
         'tipo':      'texto',
       });
-
       _msgCtrl.clear();
       await FirebaseFirestore.instance
           .collection('chats')
@@ -94,7 +85,6 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _definirValor(String pedidoId, {double? valorAtual}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     final ehCorrecao = valorAtual != null;
     _valorCtrl.text = ehCorrecao
         ? valorAtual.toStringAsFixed(2).replaceAll('.', ',')
@@ -138,31 +128,21 @@ class _ChatPageState extends State<ChatPage> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: _black,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () async {
               final valor = _MoedaBrFormatter.paraDouble(_valorCtrl.text);
               if (valor == null || valor <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Digite um valor válido.'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                  const SnackBar(content: Text('Digite um valor válido.'), backgroundColor: Colors.red));
                 return;
               }
-
               await FirebaseFirestore.instance
-                  .collection('requests')
-                  .doc(pedidoId)
+                  .collection('requests').doc(pedidoId)
                   .update({'valorServico': valor});
-
               await FirebaseFirestore.instance
-                  .collection('chats')
-                  .doc(widget.chatId)
-                  .collection('messages')
-                  .add({
+                  .collection('chats').doc(widget.chatId)
+                  .collection('messages').add({
                 'text':      ehCorrecao
                     ? '✏️ Valor corrigido para R\$ ${valor.toStringAsFixed(2)}'
                     : 'R\$ ${valor.toStringAsFixed(2)}',
@@ -172,7 +152,6 @@ class _ChatPageState extends State<ChatPage> {
                 'tipo':      ehCorrecao ? 'valor_corrigido' : 'valor_proposto',
                 'valor':     valor,
               });
-
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(ehCorrecao ? 'Salvar correção' : 'Enviar proposta',
@@ -199,29 +178,21 @@ class _ChatPageState extends State<ChatPage> {
           children: [
             Text('Valor do serviço: R\$ ${valorServico.toStringAsFixed(2)}'),
             const SizedBox(height: 8),
-            Text(
-              'Comissão (7%): R\$ ${comissao.toStringAsFixed(2)}',
-              style: const TextStyle(
-                  color: Colors.red, fontWeight: FontWeight.w600),
-            ),
+            Text('Comissão (7%): R\$ ${comissao.toStringAsFixed(2)}',
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            const Text(
-              'Esse valor será descontado da sua carteira.',
-              style: TextStyle(color: _textSecondary, fontSize: 13),
-            ),
+            const Text('Esse valor será descontado da sua carteira.',
+                style: TextStyle(color: _textSecondary, fontSize: 13)),
             const SizedBox(height: 16),
-            const Text(
-              'Peça o código de confirmação pro cliente:',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
+            const Text('Peça o código de confirmação pro cliente:',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             const SizedBox(height: 8),
             TextField(
               controller: _codigoCtrl,
               keyboardType: TextInputType.number,
               maxLength: 4,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 6),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 6),
               decoration: const InputDecoration(
                 counterText: '',
                 hintText: '0000',
@@ -231,19 +202,14 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: _green,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirmar e finalizar',
-                style: TextStyle(color: _white)),
+            child: const Text('Confirmar e finalizar', style: TextStyle(color: _white)),
           ),
         ],
       ),
@@ -263,30 +229,17 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     setState(() => _finalizando = true);
-
     try {
-      final uri = Uri.https(
-        'conectapro-backend-1.onrender.com',
-        '/pedidos/finalizar-servico/$pedidoId',
-      );
-
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'codigo': codigo}),
-      );
-
+      final uri = Uri.https('conectapro-backend-1.onrender.com', '/pedidos/finalizar-servico/$pedidoId');
+      final response = await http.post(uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'codigo': codigo}));
       final data = jsonDecode(response.body);
-
-      if (response.statusCode != 200) {
-        throw Exception(data['erro'] ?? 'Erro ao finalizar');
-      }
+      if (response.statusCode != 200) throw Exception(data['erro'] ?? 'Erro ao finalizar');
 
       await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(widget.chatId)
-          .collection('messages')
-          .add({
+          .collection('chats').doc(widget.chatId)
+          .collection('messages').add({
         'text':      'Serviço finalizado ✅',
         'senderId':  FirebaseAuth.instance.currentUser?.uid,
         'createdAt': FieldValue.serverTimestamp(),
@@ -297,8 +250,7 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              'Serviço finalizado! Comissão de R\$ ${comissao.toStringAsFixed(2)} descontada.'),
+          content: Text('Serviço finalizado! Comissão de R\$ ${comissao.toStringAsFixed(2)} descontada.'),
           backgroundColor: _green,
         ),
       );
@@ -328,11 +280,9 @@ class _ChatPageState extends State<ChatPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final snap = await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
+        .collection('chats').doc(widget.chatId)
         .collection('messages')
-        .where('isRead', isEqualTo: false)
-        .get();
+        .where('isRead', isEqualTo: false).get();
     for (var doc in snap.docs) {
       if (doc.data()['senderId'] != user.uid) {
         doc.reference.update({'isRead': true});
@@ -356,10 +306,10 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _msgCtrl.dispose();
     _valorCtrl.dispose();
+    _codigoCtrl.dispose();
     _scrollCtrl.dispose();
     FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
+        .collection('chats').doc(widget.chatId)
         .set({'typing': null}, SetOptions(merge: true));
     super.dispose();
   }
@@ -380,18 +330,25 @@ class _ChatPageState extends State<ChatPage> {
         title: const Text('Chat',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
       ),
-      body: StreamBuilder<DocumentSnapshot>(
+      // ✅ CORRIGIDO: usa StreamBuilder direto na coleção requests
+      // sem .where().cast() que causava loading infinito
+      body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('requests')
             .where('chatId', isEqualTo: widget.chatId)
             .limit(1)
-            .snapshots()
-            .map((s) => s.docs.isNotEmpty ? s.docs.first : null)
-            .where((d) => d != null)
-            .cast<DocumentSnapshot>(),
+            .snapshots(),
         builder: (context, snapPedido) {
-          final pedidoData     = snapPedido.data?.data() as Map<String, dynamic>?;
-          final pedidoId       = snapPedido.data?.id;
+
+          // ✅ Enquanto carrega — mostra o chat normalmente sem travar
+          String? pedidoId;
+          Map<String, dynamic>? pedidoData;
+          if (snapPedido.hasData && snapPedido.data!.docs.isNotEmpty) {
+            final doc = snapPedido.data!.docs.first;
+            pedidoId   = doc.id;
+            pedidoData = doc.data() as Map<String, dynamic>;
+          }
+
           final valorServico   = (pedidoData?['valorServico'] as num?)?.toDouble();
           final status         = pedidoData?['status'] ?? 'aberto';
           final providerId     = pedidoData?['providerId'] ?? '';
@@ -401,12 +358,11 @@ class _ChatPageState extends State<ChatPage> {
           return Column(
             children: [
 
-              // ─── Banner valor proposto ──────────────────────────────────
+              // ─── Banner valor proposto ────────────────────────────────
               if (valorServico != null && !isConcluido)
                 Container(
                   color: const Color(0xFFE8F5E9),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
                       const Icon(Icons.attach_money, color: _green, size: 20),
@@ -415,24 +371,19 @@ class _ChatPageState extends State<ChatPage> {
                         child: Text(
                           'Valor do serviço: R\$ ${valorServico.toStringAsFixed(2)}',
                           style: const TextStyle(
-                              color: _green,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14),
+                              color: _green, fontWeight: FontWeight.w700, fontSize: 14),
                         ),
                       ),
                       if (isProfissional && pedidoId != null)
                         GestureDetector(
-                          onTap: () => _definirValor(pedidoId,
-                              valorAtual: valorServico),
+                          onTap: () => _definirValor(pedidoId!, valorAtual: valorServico),
                           child: const Row(
                             children: [
                               Icon(Icons.edit, size: 14, color: _green),
                               SizedBox(width: 4),
                               Text('Corrigir',
                                   style: TextStyle(
-                                      color: _green,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12)),
+                                      color: _green, fontWeight: FontWeight.w700, fontSize: 12)),
                             ],
                           ),
                         ),
@@ -440,42 +391,36 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
 
-              // ─── Banner concluído ───────────────────────────────────────
+              // ─── Banner concluído ─────────────────────────────────────
               if (isConcluido)
                 Container(
                   color: const Color(0xFFE8F5E9),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.check_circle, color: _green, size: 20),
                       SizedBox(width: 8),
                       Text('Serviço concluído ✅',
-                          style: TextStyle(
-                              color: _green, fontWeight: FontWeight.w700)),
+                          style: TextStyle(color: _green, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
 
-              // ─── Indicador "Digitando..." ───────────────────────────────
+              // ─── Indicador "Digitando..." ─────────────────────────────
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance
-                    .collection('chats')
-                    .doc(widget.chatId)
-                    .snapshots(),
+                    .collection('chats').doc(widget.chatId).snapshots(),
                 builder: (_, snap) {
                   final d      = snap.data?.data() as Map<String, dynamic>?;
                   final typing = d?['typing'];
                   if (typing != null && typing != user?.uid) {
                     return const Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text('Digitando...',
-                            style: TextStyle(
-                                color: _textSecondary, fontSize: 12)),
+                            style: TextStyle(color: _textSecondary, fontSize: 12)),
                       ),
                     );
                   }
@@ -483,24 +428,35 @@ class _ChatPageState extends State<ChatPage> {
                 },
               ),
 
-              // ─── Lista de mensagens ─────────────────────────────────────
+              // ─── Lista de mensagens ───────────────────────────────────
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('chats')
-                      .doc(widget.chatId)
+                      .collection('chats').doc(widget.chatId)
                       .collection('messages')
                       .orderBy('createdAt', descending: false)
                       .snapshots(),
                   builder: (context, snap) {
-                    if (!snap.hasData) {
+                    // ✅ Mostra loading só na primeira carga
+                    if (snap.connectionState == ConnectionState.waiting &&
+                        !snap.hasData) {
                       return const Center(
                           child: CircularProgressIndicator(color: _accent));
                     }
 
-                    final docs = snap.data!.docs;
-                    _marcarComoLido();
-                    _scrollParaBaixo();
+                    final docs = snap.data?.docs ?? [];
+                    if (docs.isNotEmpty) {
+                      _marcarComoLido();
+                      _scrollParaBaixo();
+                    }
+
+                    if (docs.isEmpty) {
+                      return const Center(
+                        child: Text('Nenhuma mensagem ainda.\nDiga olá! 👋',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: _textSecondary, fontSize: 14)),
+                      );
+                    }
 
                     return ListView.builder(
                       controller: _scrollCtrl,
@@ -523,13 +479,11 @@ class _ChatPageState extends State<ChatPage> {
                                   color: const Color(0xFFE8F5E9),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Text(
-                                  data['text'] ?? '',
-                                  style: const TextStyle(
-                                      color: _green,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13),
-                                ),
+                                child: Text(data['text'] ?? '',
+                                    style: const TextStyle(
+                                        color: _green,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13)),
                               ),
                             ),
                           );
@@ -546,15 +500,13 @@ class _ChatPageState extends State<ChatPage> {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFFF8E1),
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                      color: Colors.amber.shade300),
+                                  border: Border.all(color: Colors.amber.shade300),
                                 ),
                                 child: Column(
                                   children: [
                                     const Text('💰 Proposta de valor',
                                         style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13)),
+                                            fontWeight: FontWeight.w700, fontSize: 13)),
                                     const SizedBox(height: 4),
                                     Text(
                                       'R\$ ${(data['valor'] as num).toStringAsFixed(2)}',
@@ -563,19 +515,16 @@ class _ChatPageState extends State<ChatPage> {
                                           fontWeight: FontWeight.w800,
                                           color: _green),
                                     ),
-                                    // Aviso de segurança: apenas para o cliente
                                     if (!isProfissional) ...[
                                       const SizedBox(height: 8),
-                                      const Text(
-                                        '🔒 Aviso de Segurança',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.red),
-                                      ),
+                                      const Text('🔒 Aviso de Segurança',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.red)),
                                       const SizedBox(height: 4),
                                       const Text(
-                                        'Nunca realize pagamentos antecipados. Efetue o pagamento diretamente ao profissional somente após a conclusão do serviço e a confirmação de que tudo foi realizado conforme o combinado. Essa prática ajuda a prevenir fraudes e garante mais segurança para ambas as partes.',
+                                        'Nunca realize pagamentos antecipados. Efetue o pagamento diretamente ao profissional somente após a conclusão do serviço.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                             fontSize: 11,
@@ -592,16 +541,14 @@ class _ChatPageState extends State<ChatPage> {
 
                         // Mensagem normal
                         return Align(
-                          alignment: isMe
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
+                          alignment:
+                              isMe ? Alignment.centerRight : Alignment.centerLeft,
                           child: Container(
                             margin: const EdgeInsets.symmetric(vertical: 3),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 10),
                             constraints: BoxConstraints(
-                              maxWidth:
-                                  MediaQuery.of(context).size.width * 0.72,
+                              maxWidth: MediaQuery.of(context).size.width * 0.72,
                             ),
                             decoration: BoxDecoration(
                               color: isMe ? _black : _white,
@@ -627,9 +574,8 @@ class _ChatPageState extends State<ChatPage> {
                                   child: Text(
                                     data['text'] ?? '',
                                     style: TextStyle(
-                                      color: isMe ? _white : _black,
-                                      fontSize: 14,
-                                    ),
+                                        color: isMe ? _white : _black,
+                                        fontSize: 14),
                                   ),
                                 ),
                                 const SizedBox(width: 6),
@@ -653,7 +599,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
 
-              // ─── Botões do profissional ────────────────────────────────
+              // ─── Botões do profissional ───────────────────────────────
               if (isProfissional && !isConcluido && pedidoId != null)
                 Container(
                   color: _white,
@@ -663,7 +609,7 @@ class _ChatPageState extends State<ChatPage> {
                       if (valorServico == null)
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _definirValor(pedidoId),
+                            onPressed: () => _definirValor(pedidoId!),
                             icon: const Icon(Icons.attach_money, size: 16),
                             label: const Text('Definir valor'),
                             style: OutlinedButton.styleFrom(
@@ -680,18 +626,14 @@ class _ChatPageState extends State<ChatPage> {
                           child: ElevatedButton.icon(
                             onPressed: _finalizando
                                 ? null
-                                : () => _finalizarServico(
-                                    pedidoId, valorServico),
+                                : () => _finalizarServico(pedidoId!, valorServico),
                             icon: _finalizando
                                 ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
+                                    width: 14, height: 14,
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2, color: _white))
-                                : const Icon(Icons.check_circle_outline,
-                                    size: 16),
-                            label: Text(
-                                _finalizando ? 'Aguarde...' : 'Finalizar'),
+                                : const Icon(Icons.check_circle_outline, size: 16),
+                            label: Text(_finalizando ? 'Aguarde...' : 'Finalizar'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _green,
                               foregroundColor: _white,
@@ -706,14 +648,12 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
 
-              // ─── Input de mensagem ─────────────────────────────────────
+              // ─── Input de mensagem ────────────────────────────────────
               if (!isConcluido)
                 Container(
                   color: _white,
                   padding: EdgeInsets.fromLTRB(
-                    12,
-                    8,
-                    12,
+                    12, 8, 12,
                     bottomInset > 0 ? 8 : bottomPad + 8,
                   ),
                   child: Row(
@@ -723,16 +663,14 @@ class _ChatPageState extends State<ChatPage> {
                           controller: _msgCtrl,
                           onChanged: (text) async {
                             await FirebaseFirestore.instance
-                                .collection('chats')
-                                .doc(widget.chatId)
+                                .collection('chats').doc(widget.chatId)
                                 .set({
                               'typing': text.isNotEmpty ? user?.uid : null,
                             }, SetOptions(merge: true));
                           },
                           decoration: InputDecoration(
                             hintText: 'Digite uma mensagem...',
-                            hintStyle:
-                                const TextStyle(color: _textSecondary),
+                            hintStyle: const TextStyle(color: _textSecondary),
                             filled: true,
                             fillColor: _surface,
                             contentPadding: const EdgeInsets.symmetric(
@@ -748,8 +686,7 @@ class _ChatPageState extends State<ChatPage> {
                       GestureDetector(
                         onTap: _enviando ? null : _enviarMensagem,
                         child: Container(
-                          width: 44,
-                          height: 44,
+                          width: 44, height: 44,
                           decoration: BoxDecoration(
                             color: _black,
                             borderRadius: BorderRadius.circular(22),
@@ -758,10 +695,8 @@ class _ChatPageState extends State<ChatPage> {
                               ? const Padding(
                                   padding: EdgeInsets.all(10),
                                   child: CircularProgressIndicator(
-                                      color: _white, strokeWidth: 2),
-                                )
-                              : const Icon(Icons.send,
-                                  color: _white, size: 20),
+                                      color: _white, strokeWidth: 2))
+                              : const Icon(Icons.send, color: _white, size: 20),
                         ),
                       ),
                     ],

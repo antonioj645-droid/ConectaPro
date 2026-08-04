@@ -1,12 +1,10 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../pages/login_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -14,25 +12,25 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   VideoPlayerController? _controller;
   bool _navegou = false;
+  bool _erroVideo = false;
 
   @override
   void initState() {
     super.initState();
-
-    if (kIsWeb) {
-      Timer(const Duration(seconds: 4), _navegar);
-    } else {
-      // Timer de segurança — navega após 8 segundos no máximo
-      Timer(const Duration(seconds: 8), _navegar);
-
-      _controller = VideoPlayerController.asset(
-        'assets/videos/splash_animation.mp4',
-      )..initialize().then((_) {
-          setState(() {});
-          _controller!.play();
-          _controller!.addListener(_verificarFim);
-        });
-    }
+    Timer(const Duration(seconds: 8), _navegar);
+    _controller = VideoPlayerController.asset(
+      'assets/videos/splash_animation.mp4',
+    )..initialize().then((_) {
+        if (!mounted) return;
+        setState(() {});
+        _controller!.setVolume(0);
+        _controller!.play();
+        _controller!.addListener(_verificarFim);
+      }).catchError((e) {
+        if (!mounted) return;
+        setState(() => _erroVideo = true);
+        _navegar();
+      });
   }
 
   void _verificarFim() {
@@ -64,27 +62,18 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return Scaffold(
-        body: Image.asset(
-          'assets/images/splash.png',
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.cover,
-        ),
-      );
-    }
+    final videoPronto = _controller?.value.isInitialized == true && !_erroVideo;
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: _controller?.value.isInitialized == true
-            ? AspectRatio(
+      backgroundColor: const Color(0xFF0A1128),
+      body: videoPronto
+          ? Center(
+              child: AspectRatio(
                 aspectRatio: _controller!.value.aspectRatio,
                 child: VideoPlayer(_controller!),
-              )
-            : const SizedBox.shrink(),
-      ),
+              ),
+            )
+          : const SizedBox.shrink(), // tela preta lisa enquanto o vídeo carrega, sem imagem
     );
   }
 }

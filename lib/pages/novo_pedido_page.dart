@@ -79,9 +79,8 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       'Limpeza de Colchões','Limpeza de Tapetes','Limpeza de Piscinas',
       'Limpeza de Vidros',
     ],
-    'Mudanças e Fretes': [
-      'Frete','Carreto','Mudanças Residenciais','Mudanças Comerciais',
-      'Montagem de Móveis','Desmontagem de Móveis',
+    'Frete': [
+      'Frete',
     ],
     'Chaveiro': [
       'Residencial','Comercial','Automotivo','Cofres','Fechaduras Digitais',
@@ -317,7 +316,7 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
             'categoria':    _categoriaSelecionada ?? '',
             'subcategoria': _subcategoriaSelecionada ?? '',
           }),
-        );
+        ).timeout(const Duration(seconds: 8));
       } catch (_) {}
 
       if (!mounted) return;
@@ -552,20 +551,20 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 1,
-                  child: TextFormField(
-                    controller: _numeroCtrl,
-                    keyboardType: TextInputType.text,
-                    decoration: _decoracaoPadrao(
-                      label: 'Número',
-                      hint: 'Ex: 123',
-                      icone: Icons.pin_outlined,
-                    ),
-                  ),
-                ),
               ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // NÚMERO separado — fix para mobile web
+            TextFormField(
+              controller: _numeroCtrl,
+              keyboardType: TextInputType.number,
+              decoration: _decoracaoPadrao(
+                label: 'Número',
+                hint: 'Ex: 123',
+                icone: Icons.pin_outlined,
+              ),
             ),
 
             const SizedBox(height: 16),

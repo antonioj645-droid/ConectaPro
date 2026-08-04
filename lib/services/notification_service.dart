@@ -5,29 +5,19 @@ class NotificationService {
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const settings = InitializationSettings(
-      android: android,
-    );
-
+    const settings = InitializationSettings(android: android);
     await _notifications.initialize(settings);
   }
 
   static Future<void> show(String title, String body) async {
     const android = AndroidNotificationDetails(
-      'chat_channel',
-      'Chat Notifications',
+      'conectapro_channel',       // ✅ padronizado com o backend
+      'ConectaPro Notifications',
       importance: Importance.max,
       priority: Priority.high,
+      sound: RawResourceAndroidNotificationSound('default'),
     );
-
     const details = NotificationDetails(android: android);
-
-    await _notifications.show(
-      0,
-      title,
-      body,
-      details,
-    );
+    await _notifications.show(0, title, body, details);
   }
 }

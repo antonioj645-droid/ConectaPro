@@ -18,7 +18,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage>
     with SingleTickerProviderStateMixin {
 
-  // ─── Tema (visual QP Qonex — fundo escuro, neon azul) ───────────────────────
   static const _bgTop         = Color(0xFF050914);
   static const _bgBottom      = Color(0xFF0A1226);
   static const _cardBg        = Color(0xFF0D1730);
@@ -42,6 +41,8 @@ class _LoginPageState extends State<LoginPage>
   late final AnimationController _animCtrl;
   late final Animation<double>   _fadeAnim;
   late final Animation<Offset>   _slideAnim;
+
+  final _googleSignIn = GoogleSignIn();
 
   @override
   void initState() {
@@ -137,9 +138,8 @@ class _LoginPageState extends State<LoginPage>
   Future<void> _entrarComGoogle() async {
     setState(() => _loadingGoogle = true);
     try {
-      final googleSignIn = GoogleSignIn(scopes: ['email']);
-      await googleSignIn.signOut(); // garante seleção de conta sempre
-      final googleUser = await googleSignIn.signIn();
+      await _googleSignIn.signOut();
+      final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         setState(() => _loadingGoogle = false);
         return;
@@ -161,6 +161,8 @@ class _LoginPageState extends State<LoginPage>
           'email':     user.email ?? '',
           'fotoUrl':   user.photoURL ?? '',
           'role':      'cliente',
+          'balance':   0.0,
+          'blocked':   false,
           'createdAt': Timestamp.now(),
         });
       }
@@ -274,7 +276,6 @@ class _LoginPageState extends State<LoginPage>
       backgroundColor: _bgTop,
       body: Stack(
         children: [
-          // Fundo com gradiente + estrelas/constelação
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -290,7 +291,6 @@ class _LoginPageState extends State<LoginPage>
               ),
             ),
           ),
-
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -303,31 +303,29 @@ class _LoginPageState extends State<LoginPage>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
 
-                        // LOGO com glow azul
+                        // ✅ LOGO NOVA — arredondada, maior, sem scale
                         Container(
-                          width: 110,
-                          height: 110,
+                          width: 130,
+                          height: 130,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: _accent.withOpacity(0.45),
-                                blurRadius: 40,
-                                spreadRadius: 4,
+                                color: _accent.withOpacity(0.5),
+                                blurRadius: 50,
+                                spreadRadius: 6,
                               ),
                             ],
                           ),
                           child: ClipOval(
-                            child: Transform.scale(
-                              scale: 1.35,
-                              child: Image.asset(
-                                'assets/images/logo_cp.jpeg',
-                                fit: BoxFit.cover,
-                              ),
+                            child: Image.asset(
+                              'assets/images/logo_nova.jpeg',
+                              fit: BoxFit.cover,
                             ),
                           ),
                         ),
-const SizedBox(height: 20),
+
+                        const SizedBox(height: 20),
 
                         const Text(
                           'Conectando você aos profissionais certos.',
@@ -340,7 +338,7 @@ const SizedBox(height: 20),
 
                         const SizedBox(height: 32),
 
-                        // CARTÃO COM BORDA NEON
+                        // CARTÃO
                         Container(
                           padding: const EdgeInsets.all(22),
                           decoration: BoxDecoration(
@@ -359,7 +357,7 @@ const SizedBox(height: 20),
                           child: Column(
                             children: [
 
-                              // CAMPO EMAIL
+                              // EMAIL
                               TextField(
                                 controller: _emailCtrl,
                                 keyboardType: TextInputType.emailAddress,
@@ -370,7 +368,7 @@ const SizedBox(height: 20),
 
                               const SizedBox(height: 14),
 
-                              // CAMPO SENHA
+                              // SENHA
                               TextField(
                                 controller: _senhaCtrl,
                                 obscureText: _obscurePassword,
@@ -447,7 +445,7 @@ const SizedBox(height: 20),
 
                               const SizedBox(height: 16),
 
-                              // BOTÃO ENTRAR (gradiente azul)
+                              // BOTÃO ENTRAR
                               Container(
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(14),
@@ -508,7 +506,7 @@ const SizedBox(height: 20),
 
                               const SizedBox(height: 18),
 
-                              // DIVISOR "ou"
+                              // DIVISOR
                               Row(
                                 children: [
                                   Expanded(
@@ -619,11 +617,10 @@ const SizedBox(height: 20),
   }
 }
 
-// ── Fundo de "constelação" (pontos + linhas conectando) ──────────────────────
 class _ConstelacaoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final random = Random(42); // seed fixa: mesmo padrão sempre, sem "piscar"
+    final random = Random(42);
     final pontos = List.generate(55, (_) {
       return Offset(
         random.nextDouble() * size.width,
@@ -639,7 +636,6 @@ class _ConstelacaoPainter extends CustomPainter {
       ..color = const Color(0xFF2F6FED).withOpacity(0.10)
       ..strokeWidth = 1;
 
-    // Linhas entre pontos próximos (efeito de constelação)
     for (int i = 0; i < pontos.length; i++) {
       for (int j = i + 1; j < pontos.length; j++) {
         final dist = (pontos[i] - pontos[j]).distance;
@@ -649,7 +645,6 @@ class _ConstelacaoPainter extends CustomPainter {
       }
     }
 
-    // Pontos (estrelas)
     for (final p in pontos) {
       canvas.drawCircle(p, random.nextDouble() * 1.6 + 0.6, paintPonto);
     }
@@ -659,7 +654,6 @@ class _ConstelacaoPainter extends CustomPainter {
   bool shouldRepaint(_) => false;
 }
 
-// ── Painter do "G" colorido do Google ────────────────────────────────────────
 class _GoogleGPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

@@ -14,19 +14,20 @@ import 'pages/login_page.dart';
 import 'pages/area_cliente_page.dart';
 import 'pages/area_profissional_page.dart';
 import 'pages/admin_page.dart';
+import 'pages/onboarding_cobranca_page.dart';
 
 import 'screens/splash/splash_screen.dart';
 
 const String versaoAtual = "1.0.1";
 
-// ✅ Link do app na Play Store — troque pelo link real após publicar
+// Link do app na Play Store — troque pelo link real após publicar
 const String _playStoreUrl =
     'https://play.google.com/store/apps/details?id=com.conectapro.app';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ CORRIGIDO: Firebase inicializado ANTES do runApp
+  // Firebase inicializado antes do runApp
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -148,7 +149,7 @@ class MyApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF185FA5),
         useMaterial3: true,
       ),
-      // ✅ Padroniza o layout: em telas largas (web/desktop) o conteúdo fica
+      // Padroniza o layout: em telas largas (web/desktop) o conteúdo fica
       // centralizado com a mesma largura de um celular, evitando espaçamentos
       // estranhos e mantendo o app com a mesma aparência em qualquer tela.
       builder: (context, child) {
@@ -221,7 +222,9 @@ class _AuthCheckState extends State<AuthCheck> {
 
             if (doc == null || !doc.exists) {
               Future.microtask(() => _createUser(user));
-              return const AreaClientePage();
+              // Usuário novo: ainda não viu a explicação sobre pedidos
+              // e cobranças, então mostramos ela antes da área cliente.
+              return const OnboardingCobrancaPage(role: 'cliente');
             }
 
             final data = doc.data();
@@ -232,6 +235,7 @@ class _AuthCheckState extends State<AuthCheck> {
 
             final blocked = (data['blocked'] ?? false) as bool;
             final role = (data['role'] ?? 'cliente').toString();
+            final viuOnboarding = (data['viuOnboarding'] ?? false) as bool;
 
             if (blocked) {
               return Scaffold(
@@ -263,8 +267,14 @@ class _AuthCheckState extends State<AuthCheck> {
               case 'admin':
                 return const AdminPage();
               case 'profissional':
+                if (!viuOnboarding) {
+                  return const OnboardingCobrancaPage(role: 'profissional');
+                }
                 return AreaProfissionalPage();
               default:
+                if (!viuOnboarding) {
+                  return const OnboardingCobrancaPage(role: 'cliente');
+                }
                 return const AreaClientePage();
             }
           },
@@ -280,6 +290,7 @@ class _AuthCheckState extends State<AuthCheck> {
         'role': 'cliente',
         'blocked': false,
         'balance': 0.0,
+        'viuOnboarding': false,
         'criadoEm': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 

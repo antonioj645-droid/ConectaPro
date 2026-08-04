@@ -29,21 +29,50 @@ async function enviarNotificacao(fcmToken, title, body) {
     console.log("✅ Notificação enviada para:", fcmToken);
   } catch (err) {
     console.error("⚠️ Erro ao enviar notificação:", err.message);
-    // Não lança erro — falha de notificação não deve cancelar o aceite
   }
 }
-// ──────────────────────────────────────────────────────────────────────────────
 
-// ✅ DESBLOQUEAR PEDIDO (R$3)
-router.post("/desbloquear", async (req, res) => {
+// ─── Middleware: verifica o token do Firebase Auth ────────────────────────────
+// Mesmo padrão usado em routes/pix.js: sem isso, qualquer pessoa que conheça
+// a URL do backend poderia chamar /desbloquear passando o userId de outra
+// pessoa no corpo da requisição e gastar o saldo dela sem autorização.
+async function verificarToken(req, res, next) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: "Token de autenticação ausente.",
+    });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.uid = decoded.uid;
+    next();
+  } catch (err) {
+    console.error("❌ [carteira] token inválido:", err.message);
+    return res.status(401).json({
+      success: false,
+      error: "Token de autenticação inválido ou expirado.",
+    });
+  }
+}
+
+// ✅ DESBLOQUEAR PEDIDO (R$1) — cobrado via Asaas LED
+router.post("/desbloquear", verificarToken, async (req, res) => {
 
   if (!db) {
     return res.status(500).json({ success: false, error: "Banco indisponível" });
   }
 
-  const { userId, pedidoId } = req.body;
+  // O userId agora vem do token verificado, não do corpo da requisição —
+  // impede que alguém desbloqueie um pedido gastando o saldo de outra pessoa.
+  const userId = req.uid;
+  const { pedidoId } = req.body;
 
-  if (!userId || !pedidoId) {
+  if (!pedidoId) {
     return res.status(400).json({ success: false, error: "Dados inválidos" });
   }
 
@@ -52,10 +81,8 @@ router.post("/desbloquear", async (req, res) => {
     const userRef   = db.collection("users").doc(userId);
     const pedidoRef = db.collection("requests").doc(pedidoId);
 
-    // Variáveis que precisamos fora da transaction para notificar depois
-    let clienteId   = null;
+    let clienteId        = null;
     let nomeProfissional = null;
-    let descricaoPedido  = null;
 
     await db.runTransaction(async (t) => {
 
@@ -71,20 +98,30 @@ router.post("/desbloquear", async (req, res) => {
       if (user.role !== "profissional") throw new Error("Somente profissional pode pegar pedido");
       if (pedido.providerId)            throw new Error("Pedido já foi aceito");
 
+      // ✅ Verifica saldo mínimo de R$1
       const saldo = user.balance || 0;
-      if (saldo < 3) throw new Error("Saldo insuficiente");
+      if (saldo < 1) throw new Error("Saldo insuficiente");
 
-      // Captura dados para notificação
       clienteId        = pedido.clienteId || pedido.clientId || null;
       nomeProfissional = user.nome || user.name || "Um profissional";
-      descricaoPedido  = pedido.descricao || pedido.description || "seu pedido";
 
-      // Desconta R$3
-      t.update(userRef, { balance: saldo - 3 });
+      // ✅ Desconta R$1 (não R$3)
+      t.update(userRef, { balance: saldo - 1 });
 
       // Garante chatId
       let chatId = pedido.chatId;
+      const chatNovo = !chatId;
       if (!chatId) chatId = db.collection("chats").doc().id;
+
+      // Grava quem participa do chat — a regra do Firestore usa isso pra
+      // garantir que só cliente e profissional deste pedido possam ler/escrever.
+      if (chatNovo) {
+        t.set(db.collection("chats").doc(chatId), {
+          clienteId:  clienteId,
+          providerId: userId,
+          criadoEm:   admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
 
       // Atualiza pedido
       t.update(pedidoRef, {
@@ -96,7 +133,7 @@ router.post("/desbloquear", async (req, res) => {
 
     });
 
-    // 🔔 Notifica o cliente APÓS a transaction (fora do lock)
+    // 🔔 Notifica o cliente APÓS a transaction
     if (clienteId) {
       try {
         const clienteDoc = await db.collection("users").doc(clienteId).get();

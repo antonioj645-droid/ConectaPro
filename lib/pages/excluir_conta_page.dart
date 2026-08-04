@@ -18,11 +18,14 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
   static const _red           = Color(0xFFFF3B30);
 
   final _senhaCtrl = TextEditingController();
+
+  // ✅ v7: instância única com scopes declarados no campo
+  final _googleSignIn = GoogleSignIn();
+
   bool _loading   = false;
   bool _obscure   = true;
   bool _confirmou = false;
 
-  // Detecta se o usuário entrou com Google ou e-mail
   bool get _isGoogleUser {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
@@ -40,7 +43,6 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
       _snack('Digite sua senha para confirmar');
       return;
     }
-
     if (!_confirmou) {
       _snack('Marque a caixa de confirmação para continuar');
       return;
@@ -52,12 +54,10 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // ── Reautenticação ──────────────────────────────────────────────────────
       if (_isGoogleUser) {
-        // Usuário Google: pede consentimento novamente
-        final googleSignIn = GoogleSignIn(scopes: ['email']);
-        await googleSignIn.signOut(); // força seleção de conta
-        final googleUser = await googleSignIn.signIn();
+        // ✅ v7: usa a instância do campo
+        await _googleSignIn.signOut();
+        final googleUser = await _googleSignIn.signIn();
         if (googleUser == null) {
           _snack('Autenticação cancelada');
           setState(() => _loading = false);
@@ -70,33 +70,25 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
         );
         await user.reauthenticateWithCredential(credential);
       } else {
-        // Usuário e-mail/senha
         final credential = EmailAuthProvider.credential(
           email: user.email!,
           password: _senhaCtrl.text.trim(),
         );
         await user.reauthenticateWithCredential(credential);
       }
-      // ────────────────────────────────────────────────────────────────────────
 
-      // Deletar dados do Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .delete();
 
-      // Deletar conta do Firebase Auth
       await user.delete();
 
       if (!mounted) return;
-
-      // Volta para raiz (login)
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Conta excluída com sucesso')),
       );
-
     } on FirebaseAuthException catch (e) {
       String msg;
       switch (e.code) {
@@ -133,10 +125,8 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
           children: [
             Icon(Icons.warning_amber_rounded, color: Color(0xFFFF3B30)),
             SizedBox(width: 8),
-            Text(
-              'Confirmar exclusão',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
+            Text('Confirmar exclusão',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           ],
         ),
         content: const Text(
@@ -175,10 +165,8 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
         backgroundColor: _black,
         foregroundColor: _white,
         elevation: 0,
-        title: const Text(
-          'Excluir conta',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
+        title: const Text('Excluir conta',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -186,7 +174,6 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // AVISO
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -213,15 +200,8 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
 
             const SizedBox(height: 32),
 
-            // O QUE SERÁ EXCLUÍDO
-            const Text(
-              'O que será excluído:',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: _black,
-              ),
-            ),
+            const Text('O que será excluído:',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _black)),
             const SizedBox(height: 12),
             ...[
               'Seu perfil e informações pessoais',
@@ -229,41 +209,28 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
               'Avaliações e comentários',
               'Saldo disponível na plataforma',
               'Acesso ao aplicativo',
-            ].map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 5),
-                      child: CircleAvatar(radius: 3, backgroundColor: _red),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      item,
+            ].map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 5),
+                    child: CircleAvatar(radius: 3, backgroundColor: _red),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(item,
                       style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.5,
-                          color: Color(0xFF333333)),
-                    ),
-                  ],
-                ),
+                          fontSize: 14, height: 1.5, color: Color(0xFF333333))),
+                ],
               ),
-            ),
+            )),
 
             const SizedBox(height: 32),
 
-            // CAMPO SENHA — só mostra para usuários e-mail/senha
             if (!_isGoogleUser) ...[
-              const Text(
-                'Confirme sua senha:',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: _black,
-                ),
-              ),
+              const Text('Confirme sua senha:',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _black)),
               const SizedBox(height: 12),
               TextField(
                 controller: _senhaCtrl,
@@ -274,9 +241,7 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
                   prefixIcon: const Icon(Icons.lock_outline, color: _textSecondary),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscure
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
+                      _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                       color: _textSecondary,
                     ),
                     onPressed: () => setState(() => _obscure = !_obscure),
@@ -300,7 +265,6 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
               const SizedBox(height: 24),
             ],
 
-            // AVISO para usuários Google
             if (_isGoogleUser) ...[
               Container(
                 width: double.infinity,
@@ -326,7 +290,6 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
               const SizedBox(height: 24),
             ],
 
-            // CHECKBOX CONFIRMAÇÃO
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -342,8 +305,7 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
                     padding: EdgeInsets.only(top: 12),
                     child: Text(
                       'Entendo que esta ação é irreversível e concordo com a exclusão permanente da minha conta e de todos os meus dados.',
-                      style: TextStyle(
-                          fontSize: 13, height: 1.5, color: _textSecondary),
+                      style: TextStyle(fontSize: 13, height: 1.5, color: _textSecondary),
                     ),
                   ),
                 ),
@@ -352,7 +314,6 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
 
             const SizedBox(height: 32),
 
-            // BOTÃO EXCLUIR
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -368,22 +329,15 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
                 ),
                 child: _loading
                     ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            color: _white, strokeWidth: 2),
-                      )
-                    : const Text(
-                        'Excluir minha conta',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w700),
-                      ),
+                        width: 22, height: 22,
+                        child: CircularProgressIndicator(color: _white, strokeWidth: 2))
+                    : const Text('Excluir minha conta',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // CANCELAR
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -395,10 +349,8 @@ class _ExcluirContaPageState extends State<ExcluirContaPage> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
-                child: const Text(
-                  'Cancelar',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
+                child: const Text('Cancelar',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
 

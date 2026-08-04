@@ -19,7 +19,7 @@ dependencies:
   firebase_messaging: ^16.3.0
   firebase_storage: ^13.4.2
 
-  google_sign_in: ^6.2.1
+  google_sign_in: ^6.2.1        # ✅ voltou para v6 — compatível com o código atual
 
   package_info_plus: ^8.0.2
 
