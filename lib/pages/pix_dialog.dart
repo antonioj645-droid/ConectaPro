@@ -39,6 +39,8 @@ class _PixDialogState extends State<PixDialog> {
   Uint8List? _qr;
   Timer?     _timer;
   int        _tempo     = 600;
+  StreamSubscription<DocumentSnapshot>? _statusSub;
+  bool       _fechado   = false; // evita fechar a tela duas vezes
 
   double?                  _valorEscolhido;
   final TextEditingController _controller = TextEditingController();
@@ -101,9 +103,38 @@ class _PixDialogState extends State<PixDialog> {
   @override
   void dispose() {
     _timer?.cancel();
+    _statusSub?.cancel();
     _controller.dispose();
     _cpfController.dispose();
     super.dispose();
+  }
+
+  // ─── Fecha a tela uma única vez, seja lá quem detectou a confirmação ───────
+  void _fecharComoConfirmado() {
+    if (_fechado || !mounted) return;
+    _fechado = true;
+    _timer?.cancel();
+    _statusSub?.cancel();
+    Navigator.pop(context, true);
+  }
+
+  // ─── Escuta o documento pix_payments/{id} em tempo real ────────────────────
+  // Cobre o caso em que quem credita o pagamento é o webhook da Asaas (que
+  // roda no backend, independente do app estar aberto) em vez do polling
+  // feito aqui pelo app. Assim que o status vira "CREDITADO" por qualquer um
+  // dos dois caminhos, a tela fecha sozinha.
+  void _escutarStatusFirestore() {
+    if (_paymentId.isEmpty) return;
+    _statusSub = FirebaseFirestore.instance
+        .collection('pix_payments')
+        .doc(_paymentId)
+        .snapshots()
+        .listen((doc) {
+      final status = doc.data()?['status'];
+      if (status == 'CREDITADO') {
+        _fecharComoConfirmado();
+      }
+    });
   }
 
   // ─── Inicializa PIX ────────────────────────────────────────────────────────
@@ -206,6 +237,7 @@ class _PixDialogState extends State<PixDialog> {
       });
 
       _salvarCpfNoPerfil();
+      _escutarStatusFirestore();
       _iniciarVerificacao();
       _iniciarTimer();
     } catch (e) {
@@ -241,7 +273,7 @@ class _PixDialogState extends State<PixDialog> {
         final data = jsonDecode(res.body);
         if (data['status'] == 'CONFIRMED' || data['status'] == 'RECEIVED') {
           t.cancel();
-          if (mounted) Navigator.pop(context, true);
+          _fecharComoConfirmado();
         }
       } catch (_) {}
     });
