@@ -132,7 +132,7 @@ class _MapPageState extends State<MapPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Mapa ConectaPro"),
+        title: const Text("Mapa ConectaPro+"),
       ),
 
       body: FlutterMap(

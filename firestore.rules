@@ -26,6 +26,16 @@ service cloud.firestore {
         .hasAny(['role', 'balance']);
     }
 
+    // Único caso em que o próprio usuário pode alterar o role: virar
+    // profissional (cliente -> profissional), mexendo SOMENTE no campo role.
+    // Qualquer outro valor (ex: 'admin') continua bloqueado.
+    function virandoProfissional(uid) {
+      return souEu(uid) &&
+        resource.data.get('role', 'cliente') == 'cliente' &&
+        request.resource.data.role == 'profissional' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']);
+    }
+
 
     match /users/{userId} {
 
@@ -39,11 +49,13 @@ service cloud.firestore {
 
       // Permite que o próprio usuário (ou admin) atualize seu perfil livremente,
       // EXCETO os campos protegidos (role, balance) — esses só o backend altera.
+      // Exceção: o botão "Virar profissional" (cliente -> profissional).
       // Também permite que QUALQUER usuário logado atualize apenas os campos de
       // avaliação (usado ao avaliar um profissional), com validação de tipo e
       // faixa de valor para impedir que alguém force uma nota/selo falsos.
       allow update: if souAdmin() ||
-        (souEu(userId) && naoMexeuEmCamposProtegidos()) || (
+        (souEu(userId) && naoMexeuEmCamposProtegidos()) ||
+        virandoProfissional(userId) || (
         logado() &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['totalAvaliacoes', 'somaAvaliacoes', 'mediaAvaliacao', 'verificado']) &&
@@ -58,6 +70,40 @@ service cloud.firestore {
       );
 
       allow delete: if false;
+    }
+
+
+    // Documentos do entregador (placa, CNH, CRLV, selfie).
+    // SENSÍVEIS (LGPD): só o próprio entregador e o admin podem ler.
+    // O entregador só consegue gravar com status 'pendente' — aprovar ou
+    // reprovar é exclusivo do admin.
+    match /docs_entregador/{uid} {
+
+      allow read: if souEu(uid) || souAdmin();
+
+      allow create: if souEu(uid) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.status == 'pendente';
+
+      allow update: if (souEu(uid) &&
+          request.resource.data.uid == uid &&
+          request.resource.data.status == 'pendente') ||
+        souAdmin();
+
+      allow delete: if souAdmin();
+
+      // Imagens em base64 (uma por documento: selfie, cnh, crlv, veiculo)
+      match /arquivos/{tipo} {
+        allow read: if souEu(uid) || souAdmin();
+
+        allow create, update: if souEu(uid) &&
+          tipo in ['selfie', 'cnh', 'crlv', 'veiculo'] &&
+          request.resource.data.keys().hasOnly(['base64', 'atualizadoEm']) &&
+          request.resource.data.base64 is string &&
+          request.resource.data.base64.size() < 900000;
+
+        allow delete: if souAdmin();
+      }
     }
 
 

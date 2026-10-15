@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'chat_page.dart';
 import 'perfil_profissional_page.dart';
@@ -8,7 +9,7 @@ import 'perfil_profissional_page.dart';
 class MeusPedidosPage extends StatelessWidget {
   const MeusPedidosPage({super.key});
 
-  // ─── Tema (mesma paleta da área profissional) ───────────────────────────────
+  // ─── Tema (mesma paleta da área profissional) ─────────────────────────
   static const _black         = Color(0xFF0A0A12);
   static const _navyDark      = Color(0xFF0A0A16);
   static const _white         = Color(0xFFFFFFFF);
@@ -18,6 +19,9 @@ class MeusPedidosPage extends StatelessWidget {
   static const _green         = Color(0xFF16A34A);
   static const _orange        = Color(0xFFEA580C);
   static const _red           = Color(0xFFEF4444);
+
+  // Link de avaliação do perfil ConectaPro+ no Google
+  static const _googleReviewLink = 'https://g.page/r/CXhFBknvEcvQEBM/review';
 
   Color _corStatus(String s) {
     switch (s) {
@@ -103,6 +107,57 @@ class MeusPedidosPage extends StatelessWidget {
         );
       }
     }
+  }
+
+  // Popup convidando o cliente a avaliar também no Google, depois de
+  // enviar a avaliação interna do app.
+  void _mostrarConviteAvaliacaoGoogle(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Adorou o ConectaPro+?',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'Sua avaliação foi enviada! Que tal deixar também uma avaliação pública no Google? Isso ajuda muito outras pessoas a encontrarem o ConectaPro+.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: _textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Agora não',
+                style: TextStyle(color: _textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _black,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final uri = Uri.parse(_googleReviewLink);
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Não foi possível abrir o link: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Avaliar no Google',
+                style: TextStyle(color: _white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _abrirAvaliacao(BuildContext context, String pedidoId, String providerId) {
@@ -223,6 +278,9 @@ class MeusPedidosPage extends StatelessWidget {
                               backgroundColor: _green,
                             ),
                           );
+                          // Convite pra avaliar também no Google, depois
+                          // que a avaliação interna foi enviada com sucesso.
+                          _mostrarConviteAvaliacaoGoogle(context);
                         }
                       } catch (e) {
                         if (context.mounted) {
@@ -340,7 +398,6 @@ class MeusPedidosPage extends StatelessWidget {
                     final chatId     = data['chatId'] ?? pedidoId;
                     final categoria  = data['categoria'] ?? '';
                     final providerId = data['providerId'] ?? '';
-                    final codigoConfirmacao = data['codigoConfirmacao'] ?? '';
                     final avaliacao  = data['avaliacao'];
                     final valorServico = data['valorServico'];
 
@@ -628,50 +685,6 @@ class MeusPedidosPage extends StatelessWidget {
                                             ),
                                           ),
 
-                                        // Botão concluir serviço
-                                        if (status == 'aceito') ...[
-                                          const SizedBox(height: 8),
-                                          Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFFFF4D6),
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(
-                                                  color: const Color(0xFFFFC93C)),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.center,
-                                              children: [
-                                                const Text(
-                                                  'Código de confirmação',
-                                                  style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w700,
-                                                      color: Color(0xFF8A6D00)),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  codigoConfirmacao,
-                                                  style: const TextStyle(
-                                                      fontSize: 22,
-                                                      fontWeight: FontWeight.w800,
-                                                      letterSpacing: 4,
-                                                      color: Color(0xFF5C4700)),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                const Text(
-                                                  'Só passe esse código pro profissional quando o serviço estiver pronto e você satisfeito. É ele que libera o pagamento.',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: Color(0xFF8A6D00)),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
 
                                         // Botão cancelar
                                         if (status == 'aceito' || status == 'aberto' || status == 'pendente' || status == 'open') ...[

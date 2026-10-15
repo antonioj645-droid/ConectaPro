@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -63,6 +65,32 @@ Future<void> setupNotifications() async {
     });
   } catch (e) {
     debugPrint('Erro FCM: $e');
+  }
+}
+
+/// Salva/atualiza o token FCM do usuário logado no Firestore.
+///
+/// Precisa ser chamada:
+/// 1) sempre que o usuário loga (o token pode ter mudado desde a última vez)
+/// 2) sempre que o Firebase avisar que o token foi renovado (onTokenRefresh)
+///
+/// Sem isso, o token salvo fica "parado no tempo" e o backend passa a
+/// mandar push para um token que não existe mais — a notificação simplesmente
+/// não chega, sem erro nenhum aparecendo.
+Future<void> _salvarTokenFcm(String uid) async {
+  if (kIsWeb) return;
+  try {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) return;
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .set({'fcmToken': token}, SetOptions(merge: true));
+
+    debugPrint('Token FCM atualizado para $uid: $token');
+  } catch (e) {
+    debugPrint('Erro ao salvar token FCM: $e');
   }
 }
 
@@ -143,7 +171,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ConectaPro',
+      title: 'ConectaPro+',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF185FA5),
@@ -176,11 +204,46 @@ class AuthCheck extends StatefulWidget {
 }
 
 class _AuthCheckState extends State<AuthCheck> {
+  // Guarda a assinatura do listener de renovação de token para não
+  // registrar mais de uma vez e para poder cancelar no dispose().
+  StreamSubscription<String>? _tokenRefreshSub;
+  String? _uidComListenerAtivo;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       verificarAtualizacao(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    _tokenRefreshSub?.cancel();
+    super.dispose();
+  }
+
+  /// Garante que, para o usuário logado, o token atual esteja salvo no
+  /// Firestore e que qualquer renovação futura do token seja escutada
+  /// e salva automaticamente.
+  void _garantirTokenAtualizado(String uid) {
+    // Salva o token atual (cobre o caso de login em um dispositivo novo,
+    // reinstalação do app, ou token que mudou desde o último login).
+    Future.microtask(() => _salvarTokenFcm(uid));
+
+    // Evita registrar o listener de novo a cada rebuild.
+    if (_uidComListenerAtivo == uid) return;
+
+    _tokenRefreshSub?.cancel();
+    _uidComListenerAtivo = uid;
+    _tokenRefreshSub =
+        FirebaseMessaging.instance.onTokenRefresh.listen((novoToken) {
+      debugPrint('Token FCM renovado, salvando novo token...');
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set({'fcmToken': novoToken}, SetOptions(merge: true))
+          .catchError((e) => debugPrint('Erro ao salvar token renovado: $e'));
     });
   }
 
@@ -196,6 +259,11 @@ class _AuthCheckState extends State<AuthCheck> {
         final user = authSnap.data;
 
         if (user == null) {
+          // Usuário deslogou: não faz mais sentido manter o listener
+          // de renovação de token amarrado a ele.
+          _tokenRefreshSub?.cancel();
+          _tokenRefreshSub = null;
+          _uidComListenerAtivo = null;
           return const LoginPage();
         }
 
@@ -232,6 +300,10 @@ class _AuthCheckState extends State<AuthCheck> {
             if (data == null) {
               return const LoginPage();
             }
+
+            // Usuário existente e autenticado: garante que o token FCM
+            // está em dia e que qualquer renovação futura será salva.
+            _garantirTokenAtualizado(user.uid);
 
             final blocked = (data['blocked'] ?? false) as bool;
             final role = (data['role'] ?? 'cliente').toString();
@@ -295,13 +367,7 @@ class _AuthCheckState extends State<AuthCheck> {
       }, SetOptions(merge: true));
 
       if (!kIsWeb) {
-        final token = await FirebaseMessaging.instance.getToken();
-        if (token != null) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .update({'fcmToken': token});
-        }
+        await _salvarTokenFcm(user.uid);
       }
     } catch (e) {
       debugPrint('Erro ao criar usuário: $e');

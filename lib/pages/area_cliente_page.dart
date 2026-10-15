@@ -32,6 +32,9 @@ class _AreaClientePageState extends State<AreaClientePage> {
   int    _bannerAtual = 0;
   Timer? _bannerTimer;
 
+  // 🔴 Total de mensagens não lidas (bolinha vermelha nos Meus Pedidos)
+  late final Stream<int> _naoLidosStream;
+
   // ✅ Banners com imagens reais
   static const List<Map<String, String>> _banners = [
     {
@@ -85,14 +88,44 @@ class _AreaClientePageState extends State<AreaClientePage> {
     {'nome': 'Pet',                         'icon': Icons.pets,                    'cor': Color(0xFF8D6E63)},
     {'nome': 'Moda',                        'icon': Icons.checkroom,               'cor': Color(0xFFAD1457)},
     {'nome': 'Serviços Empresariais',       'icon': Icons.business_center,         'cor': Color(0xFF37474F)},
+    {'nome': 'Faz-tudo e Montagem',        'icon': Icons.handyman,                'cor': Color(0xFFD84315)},
+    {'nome': 'Eletrodomésticos',          'icon': Icons.kitchen,                 'cor': Color(0xFF546E7A)},
+    {'nome': 'Entregas e Moto',           'icon': Icons.two_wheeler,             'cor': Color(0xFF00838F)},
+    {'nome': 'Obra Pesada',               'icon': Icons.construction,            'cor': Color(0xFFF9A825)},
+    {'nome': 'Doméstico',                 'icon': Icons.local_laundry_service,   'cor': Color(0xFF5C6BC0)},
+    {'nome': 'Alimentação',               'icon': Icons.restaurant,              'cor': Color(0xFFE64A19)},
+    {'nome': 'Despachante e Documentos',  'icon': Icons.description,             'cor': Color(0xFF6A1B9A)},
+    {'nome': 'Projetos e Engenharia',     'icon': Icons.architecture,            'cor': Color(0xFF0277BD)},
     {'nome': 'Outros Serviços',             'icon': Icons.miscellaneous_services,  'cor': Color(0xFF757575)},
   ];
 
   @override
   void initState() {
     super.initState();
+    _naoLidosStream = _criarStreamNaoLidos();
     _carregarDados();
     _iniciarBanner();
+  }
+
+  // 🔴 Escuta os chats do cliente e soma as mensagens não lidas que são pra ele
+  Stream<int> _criarStreamNaoLidos() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream<int>.value(0);
+
+    return FirebaseFirestore.instance
+        .collection('chats')
+        .where('clienteId', isEqualTo: uid)
+        .snapshots()
+        .map((snap) {
+      int total = 0;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['naoLidosPara'] == uid) {
+          total += (data['naoLidos'] as num?)?.toInt() ?? 0;
+        }
+      }
+      return total;
+    });
   }
 
   void _iniciarBanner() {
@@ -181,8 +214,19 @@ class _AreaClientePageState extends State<AreaClientePage> {
       ),
     );
     if (confirmar != true || !mounted) return;
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'role': 'profissional'});
-    await user.reload();
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'role': 'profissional'});
+      await user.reload();
+    } catch (e) {
+      debugPrint('Erro ao virar profissional: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível virar profissional agora. Tente novamente em instantes.'),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AuthCheck()), (route) => false);
@@ -216,14 +260,27 @@ class _AreaClientePageState extends State<AreaClientePage> {
         backgroundColor: _black,
         foregroundColor: _white,
         elevation: 0,
-        title: const Text('ConectaPro',
+        title: const Text('ConectaPro+',
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined),
-            tooltip: 'Meus Pedidos',
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => MeusPedidosPage())),
+          // 🔴 Ícone Meus Pedidos com bolinha vermelha de mensagens novas
+          StreamBuilder<int>(
+            stream: _naoLidosStream,
+            builder: (context, snap) {
+              final naoLidos = snap.data ?? 0;
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: naoLidos > 0,
+                  label: Text(naoLidos > 99 ? '99+' : '$naoLidos'),
+                  backgroundColor: Colors.red,
+                  textColor: Colors.white,
+                  child: const Icon(Icons.receipt_long_outlined),
+                ),
+                tooltip: 'Meus Pedidos',
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => MeusPedidosPage())),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),

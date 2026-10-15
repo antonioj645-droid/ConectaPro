@@ -11,8 +11,8 @@ class NotificationService {
 
   static Future<void> show(String title, String body) async {
     const android = AndroidNotificationDetails(
-      'conectapro_channel',       // ✅ padronizado com o backend
-      'ConectaPro Notifications',
+      'conectapro_channel',       // â padronizado com o backend
+      'ConectaPro+ Notifications',
       importance: Importance.max,
       priority: Priority.high,
       sound: RawResourceAndroidNotificationSound('default'),

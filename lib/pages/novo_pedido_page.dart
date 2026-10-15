@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:math';
 
 class NovoPedidoPage extends StatefulWidget {
   final String? categoriaInicial;
@@ -99,12 +98,15 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
       'Manicure','Pedicure','Esteticista','Massagista','Depilação',
     ],
     'Saúde e Bem-estar': [
-      'Personal Trainer','Nutricionista','Psicólogo','Fisioterapeuta',
-      'Massoterapia','Cuidador de Idosos','Cuidador Infantil',
+      'Personal Trainer','Nutricionista','Dentista','Psicólogo','Fisioterapeuta',
+      'Fonoaudiólogo','Massoterapia','Enfermeiro Domiciliar',
+      'Técnico de Enfermagem','Podólogo','Cuidador de Idosos','Cuidador Infantil',
     ],
     'Eventos': [
       'Fotógrafo','Filmagem','DJ','Banda','Garçom','Churrasqueiro',
       'Decorador','Cerimonialista','Recreador Infantil',
+      'Som e Iluminação','Aluguel de Brinquedos','Segurança de Eventos',
+      'Doces para Festa',
     ],
     'Educação': [
       'Professor Particular','Reforço Escolar','Idiomas','Música',
@@ -120,6 +122,35 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
     'Serviços Empresariais': [
       'Contador','Advogado','Consultoria','Marketing Digital',
       'Social Media','Designer Gráfico','Redator','Tradução',
+    ],
+    'Faz-tudo e Montagem': [
+      'Faz-tudo','Montador de Móveis','Instalação de TV e Suporte',
+      'Instalação de Prateleiras','Instalação de Cortinas e Persianas',
+      'Instalação de Espelhos e Quadros','Pequenos Reparos',
+    ],
+    'Eletrodomésticos': [
+      'Fogão','Cooktop','Coifa','Forno Elétrico','Aquecedor a Gás',
+    ],
+    'Entregas e Moto': [
+      'Motoboy','Entregador','Mecânico de Moto','Mecânico de Bicicleta',
+    ],
+    'Obra Pesada': [
+      'Caçamba e Entulho','Terraplanagem','Poda de Árvores',
+      'Limpeza de Fossa',
+    ],
+    'Doméstico': [
+      'Babá','Passadeira','Cozinheira','Lavanderia','Sapateiro',
+    ],
+    'Alimentação': [
+      'Marmitas','Confeitaria','Bolos e Doces','Buffet',
+    ],
+    'Despachante e Documentos': [
+      'Documentação de Veículo','Regularização de Imóvel',
+      'Despachante Geral',
+    ],
+    'Projetos e Engenharia': [
+      'Arquiteto','Engenheiro Civil','Designer de Interiores',
+      'Topógrafo','Laudos e Vistorias',
     ],
     'Outros Serviços': [
       'Dedetização','Controle de Pragas','Lavagem de Caixa d\'Água',
@@ -274,12 +305,6 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Usuário não autenticado');
-
-      // Código de confirmação (estilo iFood) — só o cliente vê,
-      // e só passa pro profissional quando o serviço estiver pronto.
-      final codigoConfirmacao =
-          (100 + Random().nextInt(900)).toString() + Random().nextInt(10).toString();
-
       final docRef = await FirebaseFirestore.instance.collection('requests').add({
         'clienteId':    user.uid,
         'titulo':       _tituloCtrl.text.trim(),
@@ -303,21 +328,36 @@ class _NovoPedidoPageState extends State<NovoPedidoPage> {
         'chatId':       null,
         'valorServico': null,
         'comissaoPaga': false,
-        'codigoConfirmacao': codigoConfirmacao,
       });
 
       try {
-        await http.post(
-          Uri.parse('https://conectapro-backend-1.onrender.com/pedidos/novo-pedido'),
-          headers: {'Content-Type': 'application/json'},
+        final idToken = await user.getIdToken();
+
+        if (idToken == null || idToken.isEmpty) {
+          throw Exception('Não foi possível obter o token de autenticação');
+        }
+
+        final notificacaoResponse = await http.post(
+          Uri.parse(
+            'https://holy-tree-63f5.conectaproplus.workers.dev/novo-pedido',
+          ),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $idToken',
+          },
           body: jsonEncode({
-            'pedidoId':     docRef.id,
-            'titulo':       _tituloCtrl.text.trim(),
-            'categoria':    _categoriaSelecionada ?? '',
-            'subcategoria': _subcategoriaSelecionada ?? '',
+            'pedidoId': docRef.id,
           }),
-        ).timeout(const Duration(seconds: 8));
-      } catch (_) {}
+        ).timeout(const Duration(seconds: 10));
+
+        debugPrint(
+          'NOTIFICACAO NOVO PEDIDO: '
+          '${notificacaoResponse.statusCode} '
+          '${notificacaoResponse.body}',
+        );
+      } catch (e) {
+        debugPrint('ERRO AO NOTIFICAR NOVO PEDIDO: $e');
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

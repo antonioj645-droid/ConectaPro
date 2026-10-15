@@ -14,10 +14,41 @@ Future<void> _cancelarServicoProfissional(
         style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         textAlign: TextAlign.center,
       ),
-      content: const Text(
-        'Não foi possível fechar esse serviço com o cliente?\nO pedido voltará para a lista de pedidos disponíveis para outros profissionais.',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Não foi possível fechar esse serviço com o cliente?\nO pedido voltará para a lista de pedidos disponíveis para outros profissionais.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF4E5),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFFD8A8)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Color(0xFFFF9500), size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Cancelamentos frequentes de serviços já aceitos podem levar à suspensão da sua conta na plataforma.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF8A5A00),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -33,7 +64,7 @@ Future<void> _cancelarServicoProfissional(
             elevation: 0,
           ),
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Cancelar serviço',
+          child: const Text('Cancelar mesmo assim',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
         ),
       ],
@@ -49,6 +80,18 @@ Future<void> _cancelarServicoProfissional(
       'acceptedAt': FieldValue.delete(),
       'canceladoPeloProfissionalEm': FieldValue.serverTimestamp(),
     });
+
+    // Soma +1 no contador de cancelamentos do profissional. Não bloqueia
+    // nada sozinho — só deixa o histórico registrado no Firestore pra
+    // você (ou uma futura regra automática) decidir suspender contas
+    // com cancelamento repetido.
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'cancelamentosProfissional': FieldValue.increment(1),
+        'ultimoCancelamentoEm': FieldValue.serverTimestamp(),
+      });
+    }
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

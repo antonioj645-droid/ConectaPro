@@ -47,11 +47,113 @@ class _ChatPageState extends State<ChatPage> {
 
   final TextEditingController _msgCtrl    = TextEditingController();
   final TextEditingController _valorCtrl  = TextEditingController();
-  final TextEditingController _codigoCtrl = TextEditingController();
   final ScrollController      _scrollCtrl = ScrollController();
 
   bool _enviando    = false;
   bool _finalizando = false;
+
+  Future<void> _notificarMensagem(String messageId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) return;
+
+      final response = await http.post(
+        Uri.parse('https://holy-tree-63f5.conectaproplus.workers.dev/chat-message'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({
+          'chatId': widget.chatId,
+          'messageId': messageId,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint(
+        'NOTIFICACAO CHAT: ${response.statusCode} ${response.body}',
+      );
+    } catch (e) {
+      debugPrint('ERRO AO NOTIFICAR CHAT: $e');
+    }
+  }
+
+  // 🔴 Marca no chat que a OUTRA pessoa tem mensagem nova (bolinha vermelha)
+  Future<void> _registrarNaoLido() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final ref  = FirebaseFirestore.instance.collection('chats').doc(widget.chatId);
+      final snap = await ref.get();
+      final d    = snap.data() ?? <String, dynamic>{};
+
+      String? clienteId  = d['clienteId']?.toString();
+      String? providerId = d['providerId']?.toString();
+
+      // Se o chat ainda não tem os ids, tenta pegar do pedido
+      if (clienteId == null || clienteId.isEmpty ||
+          providerId == null || providerId.isEmpty) {
+        final reqSnap = await FirebaseFirestore.instance
+            .collection('requests')
+            .where('chatId', isEqualTo: widget.chatId)
+            .limit(1)
+            .get();
+        if (reqSnap.docs.isNotEmpty) {
+          final r = reqSnap.docs.first.data();
+          if (clienteId == null || clienteId.isEmpty) {
+            clienteId = (r['clienteId'] ?? r['clientId'])?.toString();
+          }
+          if (providerId == null || providerId.isEmpty) {
+            providerId = r['providerId']?.toString();
+          }
+        }
+      }
+
+      String? destino;
+      if (user.uid == clienteId) {
+        destino = providerId;
+      } else if (user.uid == providerId) {
+        destino = clienteId;
+      }
+      if (destino == null || destino.isEmpty) return;
+
+      final atual        = (d['naoLidos'] as num?)?.toInt() ?? 0;
+      final mesmoDestino = d['naoLidosPara'] == destino;
+
+      await ref.set({
+        'naoLidosPara': destino,
+        'naoLidos':     mesmoDestino ? atual + 1 : 1,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('ERRO AO REGISTRAR NAO LIDO: $e');
+    }
+  }
+
+  // 🔴 Quando eu abro o chat, zera a bolinha que era pra mim
+  Future<void> _zerarNaoLidos() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final ref  = FirebaseFirestore.instance.collection('chats').doc(widget.chatId);
+      final snap = await ref.get();
+      final d    = snap.data();
+      if (d == null) return;
+
+      final n = (d['naoLidos'] as num?)?.toInt() ?? 0;
+      if (d['naoLidosPara'] == user.uid && n > 0) {
+        await ref.set({
+          'naoLidos':     0,
+          'naoLidosPara': null,
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('ERRO AO ZERAR NAO LIDOS: $e');
+    }
+  }
 
   Future<void> _enviarMensagem() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -61,7 +163,7 @@ class _ChatPageState extends State<ChatPage> {
 
     setState(() => _enviando = true);
     try {
-      await FirebaseFirestore.instance
+      final mensagemRef = await FirebaseFirestore.instance
           .collection('chats')
           .doc(widget.chatId)
           .collection('messages')
@@ -72,6 +174,9 @@ class _ChatPageState extends State<ChatPage> {
         'isRead':    false,
         'tipo':      'texto',
       });
+
+      await _registrarNaoLido();
+      await _notificarMensagem(mensagemRef.id);
       _msgCtrl.clear();
       await FirebaseFirestore.instance
           .collection('chats')
@@ -152,6 +257,7 @@ class _ChatPageState extends State<ChatPage> {
                 'tipo':      ehCorrecao ? 'valor_corrigido' : 'valor_proposto',
                 'valor':     valor,
               });
+              await _registrarNaoLido();
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: Text(ehCorrecao ? 'Salvar correção' : 'Enviar proposta',
@@ -164,7 +270,6 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _finalizarServico(String pedidoId, double valorServico) async {
     final comissao = valorServico * 0.07;
-    _codigoCtrl.clear();
 
     final confirmar = await showDialog<bool>(
       context: context,
@@ -183,22 +288,6 @@ class _ChatPageState extends State<ChatPage> {
             const SizedBox(height: 12),
             const Text('Esse valor será descontado da sua carteira.',
                 style: TextStyle(color: _textSecondary, fontSize: 13)),
-            const SizedBox(height: 16),
-            const Text('Peça o código de confirmação pro cliente:',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _codigoCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 6),
-              decoration: const InputDecoration(
-                counterText: '',
-                hintText: '0000',
-                border: OutlineInputBorder(),
-              ),
-            ),
           ],
         ),
         actions: [
@@ -217,23 +306,12 @@ class _ChatPageState extends State<ChatPage> {
 
     if (confirmar != true) return;
 
-    final codigo = _codigoCtrl.text.trim();
-    if (codigo.length != 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Digite o código de 4 dígitos que o cliente te passou.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
     setState(() => _finalizando = true);
     try {
       final uri = Uri.https('conectapro-backend-1.onrender.com', '/pedidos/finalizar-servico/$pedidoId');
       final response = await http.post(uri,
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'codigo': codigo}));
+          body: jsonEncode({}));
       final data = jsonDecode(response.body);
       if (response.statusCode != 200) throw Exception(data['erro'] ?? 'Erro ao finalizar');
 
@@ -246,6 +324,7 @@ class _ChatPageState extends State<ChatPage> {
         'isRead':    false,
         'tipo':      'sistema',
       });
+      await _registrarNaoLido();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -263,9 +342,7 @@ class _ChatPageState extends State<ChatPage> {
                 ? '💰 Saldo insuficiente! Adicione créditos na carteira.'
                 : e.toString().contains('Valor do serviço não definido')
                     ? '⚠️ Defina o valor do serviço antes de finalizar.'
-                    : e.toString().contains('Código de confirmação')
-                        ? '🔑 Código incorreto. Confirme com o cliente e tente de novo.'
-                        : 'Erro ao finalizar: $e',
+                    : 'Erro ao finalizar: $e',
           ),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 4),
@@ -285,9 +362,11 @@ class _ChatPageState extends State<ChatPage> {
         .where('isRead', isEqualTo: false).get();
     for (var doc in snap.docs) {
       if (doc.data()['senderId'] != user.uid) {
-        doc.reference.update({'isRead': true});
+        await doc.reference.update({'isRead': true});
       }
     }
+    // 🔴 some a bolinha vermelha de quem abriu o chat
+    await _zerarNaoLidos();
   }
 
   void _scrollParaBaixo() {
@@ -306,7 +385,6 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _msgCtrl.dispose();
     _valorCtrl.dispose();
-    _codigoCtrl.dispose();
     _scrollCtrl.dispose();
     FirebaseFirestore.instance
         .collection('chats').doc(widget.chatId)
@@ -581,9 +659,7 @@ class _ChatPageState extends State<ChatPage> {
                                 const SizedBox(width: 6),
                                 if (isMe)
                                   Icon(
-                                    data['isRead'] == true
-                                        ? Icons.done_all
-                                        : Icons.done,
+                                    Icons.done_all,
                                     size: 14,
                                     color: data['isRead'] == true
                                         ? _accent

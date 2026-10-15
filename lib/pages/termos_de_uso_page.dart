@@ -28,7 +28,7 @@ class TermosDeUsoPage extends StatelessWidget {
 
           // Cabeçalho
           Text(
-            'ConectaPro',
+            'ConectaPro+',
             style: TextStyle(
               fontSize: 26, fontWeight: FontWeight.w900, color: _accent,
             ),
@@ -44,7 +44,7 @@ class TermosDeUsoPage extends StatelessWidget {
             numero: '1',
             titulo: 'Aceitação dos Termos',
             corpo:
-              'Ao baixar, instalar ou utilizar o ConectaPro, você concorda integralmente com estes Termos de Uso. '
+              'Ao baixar, instalar ou utilizar o ConectaPro+, você concorda integralmente com estes Termos de Uso. '
               'Se não concordar com qualquer parte, não utilize o aplicativo.\n\n'
               'Reservamo-nos o direito de alterar estes Termos a qualquer momento, '
               'mediante aviso prévio no aplicativo.',
@@ -54,15 +54,15 @@ class TermosDeUsoPage extends StatelessWidget {
             numero: '2',
             titulo: 'Descrição do Serviço',
             corpo:
-              'O ConectaPro é uma plataforma de marketplace que conecta clientes a profissionais autônomos de serviços. '
+              'O ConectaPro+ é uma plataforma de marketplace que conecta clientes a profissionais autônomos de serviços. '
               'Atuamos como intermediário tecnológico, não sendo parte da relação contratual entre clientes e profissionais.\n\n'
-              'A ConectaPro não garante a qualidade ou adequação dos serviços oferecidos pelos profissionais cadastrados.',
+              'A ConectaPro+ não garante a qualidade ou adequação dos serviços oferecidos pelos profissionais cadastrados.',
           ),
 
           _Section(
             numero: '3',
             titulo: 'Cadastro e Conta de Usuário',
-            corpo: 'Para utilizar o ConectaPro, você deve:',
+            corpo: 'Para utilizar o ConectaPro+, você deve:',
             bullets: [
               'Ter pelo menos 18 anos de idade;',
               'Fornecer informações verdadeiras e completas no cadastro;',
@@ -81,7 +81,7 @@ class TermosDeUsoPage extends StatelessWidget {
           _Section(
             numero: '5',
             titulo: 'Pagamentos e Taxas',
-            corpo: 'O ConectaPro processa pagamentos de forma segura. Ao realizar uma transação, você concorda que:',
+            corpo: 'O ConectaPro+ processa pagamentos de forma segura. Ao realizar uma transação, você concorda que:',
             bullets: [
               'Os valores são definidos livremente pelos profissionais;',
               'A plataforma pode cobrar taxa de intermediação;',
@@ -107,7 +107,7 @@ class TermosDeUsoPage extends StatelessWidget {
             numero: '7',
             titulo: 'Privacidade e Proteção de Dados',
             corpo:
-              'O ConectaPro está comprometido com a proteção dos seus dados pessoais, em conformidade com a LGPD (Lei nº 13.709/2018). '
+              'O ConectaPro+ está comprometido com a proteção dos seus dados pessoais, em conformidade com a LGPD (Lei nº 13.709/2018). '
               'Coletamos apenas os dados necessários para a prestação do serviço, como nome, e-mail, telefone e histórico de transações.\n\n'
               'Não vendemos seus dados a terceiros.',
           ),
@@ -128,14 +128,14 @@ class TermosDeUsoPage extends StatelessWidget {
             numero: '9',
             titulo: 'Propriedade Intelectual',
             corpo:
-              'Todo o conteúdo do ConectaPro — textos, imagens, logotipos, código-fonte e design — é de propriedade exclusiva da ConectaPro ou de seus licenciantes. '
+              'Todo o conteúdo do ConectaPro+ — textos, imagens, logotipos, código-fonte e design — é de propriedade exclusiva da ConectaPro+ ou de seus licenciantes. '
               'É vedada a reprodução ou uso comercial sem autorização expressa e por escrito.',
           ),
 
           _Section(
             numero: '10',
             titulo: 'Limitação de Responsabilidade',
-            corpo: 'A ConectaPro não se responsabiliza por:',
+            corpo: 'A ConectaPro+ não se responsabiliza por:',
             bullets: [
               'Danos decorrentes da execução dos serviços pelos profissionais;',
               'Falhas temporárias no aplicativo por manutenção ou causas externas;',
@@ -147,7 +147,7 @@ class TermosDeUsoPage extends StatelessWidget {
             numero: '11',
             titulo: 'Rescisão e Suspensão',
             corpo:
-              'A ConectaPro pode suspender ou encerrar sua conta em casos de violação destes Termos, comportamento fraudulento ou determinação judicial. '
+              'A ConectaPro+ pode suspender ou encerrar sua conta em casos de violação destes Termos, comportamento fraudulento ou determinação judicial. '
               'Você pode encerrar sua conta a qualquer momento nas configurações do aplicativo.',
           ),
 
@@ -165,7 +165,7 @@ class TermosDeUsoPage extends StatelessWidget {
             titulo: 'Contato',
             corpo: 'Para dúvidas ou reclamações, entre em contato:',
             bullets: [
-              'E-mail: suporte@conectapro.com.br',
+              'E-mail: conectaproplus@gmail.com',
               'Aplicativo: acesse "Ajuda" no menu principal',
             ],
           ),
@@ -175,7 +175,7 @@ class TermosDeUsoPage extends StatelessWidget {
           SizedBox(height: 12),
 
           Text(
-            'ConectaPro — Conectando você aos melhores profissionais',
+            'ConectaPro+ — Conectando você aos melhores profissionais',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12, color: _textSecondary, fontStyle: FontStyle.italic,

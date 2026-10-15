@@ -41,6 +41,9 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
   double? _minhaLat;
   double? _minhaLng;
 
+  // 🔴 Total de mensagens não lidas (bolinha vermelha na maleta Meus serviços)
+  late final Stream<int> _naoLidosStream;
+
   Map<String, dynamic> _categoriaEstilo(String categoria) {
     final cat = categoria.toLowerCase();
     if (cat.contains('elétric') || cat.contains('eletric'))
@@ -68,7 +71,29 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
   @override
   void initState() {
     super.initState();
+    _naoLidosStream = _criarStreamNaoLidos();
     _salvarLocalizacao();
+  }
+
+  // 🔴 Escuta os chats do profissional e soma as mensagens não lidas que são pra ele
+  Stream<int> _criarStreamNaoLidos() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream<int>.value(0);
+
+    return FirebaseFirestore.instance
+        .collection('chats')
+        .where('providerId', isEqualTo: uid)
+        .snapshots()
+        .map((snap) {
+      int total = 0;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['naoLidosPara'] == uid) {
+          total += (data['naoLidos'] as num?)?.toInt() ?? 0;
+        }
+      }
+      return total;
+    });
   }
 
   Future<void> _salvarLocalizacao() async {
@@ -174,6 +199,26 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
           'status': 'aceito',
           'acceptedAt': FieldValue.serverTimestamp(),
         });
+        try {
+          final idToken = await user.getIdToken();
+
+          if (idToken != null && idToken.isNotEmpty) {
+            final notificacaoResponse = await http.post(
+              Uri.parse('https://holy-tree-63f5.conectaproplus.workers.dev/pedido-aceito'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $idToken',
+              },
+              body: jsonEncode({'pedidoId': pedidoId}),
+            ).timeout(const Duration(seconds: 10));
+
+            debugPrint(
+              'NOTIFICACAO PEDIDO ACEITO: ${notificacaoResponse.statusCode} ${notificacaoResponse.body}',
+            );
+          }
+        } catch (e) {
+          debugPrint('ERRO AO NOTIFICAR PEDIDO ACEITO: $e');
+        }
 
         final chatFinal = (chatId != null && chatId.isNotEmpty) ? chatId : pedidoId;
 
@@ -499,13 +544,30 @@ class _AreaProfissionalPageState extends State<AreaProfissionalPage> {
         children: [
           Text('Conecta', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: -0.3, color: _white)),
           Text('Pro',     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: -0.3, color: _accent)),
+          Text('+',       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: -0.3, color: _accent)),
         ],
       ),
       actions: [
         IconButton(icon: const Icon(Icons.history_rounded, size: 22), tooltip: 'Histórico',
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistoricoServicosPage()))),
-        IconButton(icon: const Icon(Icons.work_outline_rounded, size: 22), tooltip: 'Meus serviços',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MeusServicosPage()))),
+        // 🔴 Maleta Meus serviços com bolinha vermelha de mensagens novas
+        StreamBuilder<int>(
+          stream: _naoLidosStream,
+          builder: (context, snap) {
+            final naoLidos = snap.data ?? 0;
+            return IconButton(
+              icon: Badge(
+                isLabelVisible: naoLidos > 0,
+                label: Text(naoLidos > 99 ? '99+' : '$naoLidos'),
+                backgroundColor: Colors.red,
+                textColor: Colors.white,
+                child: const Icon(Icons.work_outline_rounded, size: 22),
+              ),
+              tooltip: 'Meus serviços',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MeusServicosPage())),
+            );
+          },
+        ),
         Stack(
           clipBehavior: Clip.none,
           children: [
